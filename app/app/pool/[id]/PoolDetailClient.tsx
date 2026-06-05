@@ -132,7 +132,7 @@ export default function PoolDetailClient() {
                 <div style={{ fontWeight: 700, color: "var(--accent)" }}>
                   {position?.claimed ? `${position.claimableRewards.toFixed(4)} THEO` :
                    pool.rewardPerSurvivor > 0 ? `~${(0.20 + pool.rewardPerSurvivor).toFixed(4)} THEO` :
-                   pool.survivorCount > 0 ? `~${(0.20 + pool.penaltyVaultBalance / pool.survivorCount).toFixed(4)} THEO` :
+                   pool.survivorCount > 0 ? `~${(0.20 + Math.floor(pool.penaltyVaultBalance * 100 / pool.survivorCount) / 100).toFixed(2)} THEO` :
                    "0.20 THEO + rewards"}
                 </div>
               </div>

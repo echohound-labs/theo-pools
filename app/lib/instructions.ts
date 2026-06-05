@@ -148,7 +148,7 @@ export async function getUserPositions(wallet: PublicKey): Promise<UserPosition[
             claimed: pos.claimed ?? false,
             redistributionCollected: pos.redistributionCollected ?? false,
             lockupEnds: pool.endTime,
-            redistributionPerClaimer: pool.rewardPerSurvivor > 0 ? Math.floor(pool.penaltyVaultBalance * 100 / pool.playerCount) / 100 : 0,
+            redistributionPerClaimer: (poolAcc.redistributionPerClaimer?.toNumber() ?? 0) / DECIMALS,
             poolStatus: pool.status,
           });
         }

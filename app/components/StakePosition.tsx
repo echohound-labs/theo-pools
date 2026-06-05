@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
-import { exitPool, claimRewards } from "@/lib/instructions";
+import { exitPool, claimRewards, collectRedistribution } from "@/lib/instructions";
 import { UserPosition } from "@/lib/types";
 
 interface StakePositionProps {
@@ -12,6 +12,7 @@ interface StakePositionProps {
 export function StakePosition({ position, onRefresh }: StakePositionProps) {
   const [exiting, setExiting] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [collecting, setCollecting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
@@ -38,6 +39,23 @@ export function StakePosition({ position, onRefresh }: StakePositionProps) {
       setMessage({ type: "error", text: err instanceof Error ? err.message : "Exit failed" });
     } finally {
       setExiting(false);
+    }
+  }
+
+  async function handleCollect() {
+    if (!publicKey) return;
+    setCollecting(true);
+    setMessage(null);
+    try {
+      const tx = await collectRedistribution(position.poolId, publicKey);
+      const sig = await sendTransaction(tx, connection, { skipPreflight: true });
+      await connection.confirmTransaction(sig, "confirmed");
+      setMessage({ type: "success", text: `Collected ${position.redistributionPerClaimer.toFixed(4)} THEO redistribution bonus!` });
+      onRefresh?.();
+    } catch (err: unknown) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Collect failed" });
+    } finally {
+      setCollecting(false);
     }
   }
 
@@ -121,6 +139,11 @@ export function StakePosition({ position, onRefresh }: StakePositionProps) {
         {canClaim && (
           <button className="btn btn-primary" onClick={handleClaim} disabled={claiming} style={{ flex: 1, fontSize: 13 }}>
             {claiming ? <><span className="spinner" /> Claiming…</> : "🏆 Claim Rewards"}
+          </button>
+        )}
+        {position.claimed && !position.redistributionCollected && position.redistributionPerClaimer > 0 && position.poolStatus === "Finalized" && (
+          <button className="btn btn-primary" onClick={handleCollect} disabled={collecting} style={{ flex: 1, fontSize: 13 }}>
+            {collecting ? <><span className="spinner" /> Collecting…</> : `🎁 Collect ${position.redistributionPerClaimer.toFixed(2)} THEO bonus`}
           </button>
         )}
         {position.claimed && (

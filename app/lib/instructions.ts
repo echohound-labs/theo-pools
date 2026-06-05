@@ -148,6 +148,8 @@ export async function getUserPositions(wallet: PublicKey): Promise<UserPosition[
             claimed: pos.claimed ?? false,
             redistributionCollected: pos.redistributionCollected ?? false,
             lockupEnds: pool.endTime,
+            redistributionPerClaimer: pool.rewardPerSurvivor > 0 ? Math.floor(pool.penaltyVaultBalance * 100 / pool.playerCount) / 100 : 0,
+            poolStatus: pool.status,
           });
         }
       } catch { }
@@ -279,6 +281,21 @@ export async function sweepEmptyVault(poolId: string, wallet: PublicKey): Promis
     tokenMint: THEO_MINT,
     poolVault: PDAs.vault(id),
     rolloverVault: PDAs.rolloverVault(),
+    tokenProgram: TOKEN_2022_PROGRAM_ID,
+  }).instruction();
+  return makeTx(wallet, ix);
+}
+
+export async function collectRedistribution(poolId: string, wallet: PublicKey): Promise<Transaction> {
+  const program = getReadonlyProgram();
+  const id = Number(poolId);
+  const ix = await (program.methods as any).collectRedistribution().accounts({
+    player: wallet,
+    pool: PDAs.pool(id),
+    userPosition: PDAs.position(id, wallet),
+    tokenMint: THEO_MINT,
+    playerTokenAccount: await ata(wallet),
+    poolVault: PDAs.vault(id),
     tokenProgram: TOKEN_2022_PROGRAM_ID,
   }).instruction();
   return makeTx(wallet, ix);

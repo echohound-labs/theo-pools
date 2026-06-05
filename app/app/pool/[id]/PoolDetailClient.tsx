@@ -68,7 +68,7 @@ export default function PoolDetailClient() {
   const canClaim = hasPosition && !position?.exitedEarly && !position?.claimed && (pool.status === "Claiming" || (pool.status === "Active" && gameEnded));
   const canWithdraw = hasPosition && (pool.status === "Filling" || pool.status === "Closed");
   const canClose = pool.status === "Filling";
-  const canFinalize = claimWindowClosed && pool.status !== "Finalized";
+  const canFinalize = pool.status === "Claiming" && (claimWindowClosed || pool.claimedCount >= pool.survivorCount);
   const canSweep = pool.status === "Closed" && pool.playerCount === 0;
 
   return (

@@ -19,6 +19,7 @@ export interface Pool {
   claimDeadline: number;
   fillDeadline: number;
   rewardPerSurvivor: number;
+  claimedCount: number;
   poolAuthority?: string;
   stakeMint?: string;
 }

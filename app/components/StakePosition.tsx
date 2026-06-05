@@ -21,9 +21,9 @@ export function StakePosition({ position, onRefresh }: StakePositionProps) {
   const gameEnded = position.lockupEnds ? now > position.lockupEnds : false;
   const claimWindowEnd = position.lockupEnds ? position.lockupEnds + 5 * 24 * 60 * 60 : 0;
   const claimWindowClosed = claimWindowEnd > 0 && now > claimWindowEnd;
-  const canExit = !position.exitedEarly && !position.claimed && !gameEnded;
-  const canClaim = !position.claimed && !position.exitedEarly && gameEnded && !claimWindowClosed;
   const rolledOver = !position.claimed && !position.exitedEarly && (claimWindowClosed || position.poolStatus === "Finalized" || position.poolStatus === "Claiming");
+  const canExit = !position.exitedEarly && !position.claimed && !gameEnded;
+  const canClaim = !position.claimed && !position.exitedEarly && gameEnded && !claimWindowClosed && !rolledOver;
 
   async function handleExit() {
     if (!publicKey) return;

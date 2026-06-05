@@ -105,15 +105,14 @@ pub fn handler(ctx: Context<FinalizePool>) -> Result<()> {
             .checked_mul(Pool::STAKE_AMOUNT)
             .ok_or(ErrorCode::MathOverflow)?;
 
-        // FIX: Also rollover unclaimed rewards (penalty shares)
-        let unclaimed_rewards = unclaimed_survivor_count
-            .checked_mul(pool.reward_per_survivor)
-            .ok_or(ErrorCode::MathOverflow)?;
-
-        rolled_over = pool.redistribution_dust
-            .checked_add(unclaimed_stakes)
-            .ok_or(ErrorCode::MathOverflow)?
-            .checked_add(unclaimed_rewards)
+        // rolled_over = unclaimed stakes + dust
+        // The unclaimed penalties are split as:
+        //   redistribution_per_claimer * claimed_count → goes to claimers via collect_redistribution  
+        //   redistribution_dust → rolls over (can't be split further)
+        // The unclaimed survivor's reward_per_survivor share is already accounted for
+        // in redistribution_per_claimer calculation above.
+        rolled_over = unclaimed_stakes
+            .checked_add(pool.redistribution_dust)
             .ok_or(ErrorCode::MathOverflow)?;
     }
 

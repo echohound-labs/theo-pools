@@ -4,11 +4,12 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { Pool } from "@/lib/types";
-import { getAllPools, createPool } from "@/lib/instructions";
+import { getAllPools, createPool, getRolloverBalance } from "@/lib/instructions";
 import { PoolCard } from "@/components/PoolCard";
 
 export default function PoolsPage() {
   const [pools, setPools] = useState<Pool[]>([]);
+  const [rolloverBalance, setRolloverBalance] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -18,6 +19,7 @@ export default function PoolsPage() {
 
   useEffect(() => {
     getAllPools().then((data) => { setPools(data); setLoading(false); });
+    getRolloverBalance().then(setRolloverBalance);
   }, []);
 
   const totalTVL = pools.reduce((sum, p) => sum + p.tvl, 0);
@@ -55,6 +57,7 @@ export default function PoolsPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 40, padding: "20px 24px", background: "var(--bg-secondary)", borderRadius: "var(--radius)", border: "1px solid var(--border-subtle)" }}>
           <StatItem label="Total Value Locked" value={totalTVL < 1 ? `${totalTVL.toFixed(2)} THEO` : `${(totalTVL / 1000).toFixed(1)}k THEO`} />
           <StatItem label="Active Pools" value={`${pools.length}`} center />
+          <StatItem label="Next Pool Seed" value={rolloverBalance > 0 ? `${rolloverBalance.toFixed(2)} THEO` : "—"} />
           <StatItem label="Total Stakers" value={`${totalPlayers.toLocaleString()}`} right />
         </div>
       )}

@@ -300,3 +300,13 @@ export async function collectRedistribution(poolId: string, wallet: PublicKey): 
   }).instruction();
   return makeTx(wallet, ix);
 }
+
+export async function getRolloverBalance(): Promise<number> {
+  try {
+    const program = getReadonlyProgram();
+    const gs = await (program.account as any).globalState.fetch(PDAs.globalState());
+    return (gs.rolloverBalance?.toNumber() ?? 0) / DECIMALS;
+  } catch {
+    return 0;
+  }
+}

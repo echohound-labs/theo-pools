@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 
-export function Countdown({ targetTime, label }: { targetTime: number; label: string }) {
+export function Countdown({ targetTime, label, onComplete }: { targetTime: number; label: string; onComplete?: () => void }) {
   const [timeLeft, setTimeLeft] = useState(Math.max(0, targetTime - Math.floor(Date.now() / 1000)));
 
   useEffect(() => {

@@ -212,7 +212,8 @@ impl Pool {
 
     /// Returns true if finalization is permissible.
     pub fn can_finalize(&self, now: i64) -> bool {
-        self.status == PoolStatus::Claiming && now > self.claim_deadline
+        self.status == PoolStatus::Claiming && 
+        (now > self.claim_deadline || self.claimed_count == self.survivor_count)
     }
 }
 

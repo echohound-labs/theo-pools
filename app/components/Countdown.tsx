@@ -6,7 +6,9 @@ export function Countdown({ targetTime, label }: { targetTime: number; label: st
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTimeLeft(Math.max(0, targetTime - Math.floor(Date.now() / 1000)));
+      const t = Math.max(0, targetTime - Math.floor(Date.now() / 1000));
+      setTimeLeft(t);
+      if (t === 0 && onComplete) { onComplete(); clearInterval(interval); }
     }, 1000);
     return () => clearInterval(interval);
   }, [targetTime]);

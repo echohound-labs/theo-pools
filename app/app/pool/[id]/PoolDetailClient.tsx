@@ -105,9 +105,9 @@ export default function PoolDetailClient() {
         </div>
 
         <div style={{ paddingTop: 20, borderTop: "1px solid var(--border-subtle)" }}>
-          {pool.status === "Filling" && pool.fillDeadline > 0 && <Countdown targetTime={pool.fillDeadline} label="Fill Window Closes" />}
-          {pool.status === "Active" && pool.endTime > 0 && !gameEnded && <Countdown targetTime={pool.endTime} label="Game Ends In" />}
-          {(pool.status === "Claiming" || (pool.status === "Active" && gameEnded)) && pool.claimDeadline > 0 && <Countdown targetTime={pool.claimDeadline} label="Claim Window Closes" />}
+          {pool.status === "Filling" && pool.fillDeadline > 0 && <Countdown targetTime={pool.fillDeadline} label="Fill Window Closes" onComplete={fetchData} />}
+          {pool.status === "Active" && pool.endTime > 0 && !gameEnded && <Countdown targetTime={pool.endTime} label="Game Ends In" onComplete={fetchData} />}
+          {(pool.status === "Claiming" || (pool.status === "Active" && gameEnded)) && pool.claimDeadline > 0 && <Countdown targetTime={pool.claimDeadline} label="Claim Window Closes" onComplete={fetchData} />}
           {pool.status === "Filling" && pool.fillDeadline === 0 && <div style={{ fontSize: 13, color: "var(--text-muted)" }}>⏳ Waiting for first player to start fill timer…</div>}
         </div>
       </div>

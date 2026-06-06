@@ -86,11 +86,11 @@ export default function PoolsPage() {
             There are no pools running right now. Create one to start the game — it's permissionless, anyone can do it!
           </p>
           {rolloverBalance > 0 && (
-            <div style={{ background: "rgba(252,163,17,0.1)", border: "1px solid rgba(252,163,17,0.3)", borderRadius: "var(--radius)", padding: "12px 24px", marginBottom: 24, display: "inline-block" }}>
+            <div style={{ background: "rgba(252,163,17,0.1)", border: "1px solid rgba(252,163,17,0.3)", borderRadius: "var(--radius)", padding: "12px 24px", marginBottom: 16, display: "inline-block" }}>
               <span style={{ color: "var(--accent)", fontWeight: 700, fontSize: 16 }}>🔄 Pool #{nextPoolId} will be seeded with {rolloverBalance.toFixed(2)} THEO!</span>
             </div>
           )}
-          <button className="btn btn-primary" onClick={handleCreatePool} disabled={creating} style={{ padding: "14px 32px", fontSize: 16 }}>
+          <button className="btn btn-primary" onClick={handleCreatePool} disabled={creating} style={{ padding: "14px 32px", fontSize: 16, marginTop: 8 }}>
             {creating ? <><span className="spinner" /> Creating Pool…</> : "🆕 Create New Pool"}
           </button>
           {!publicKey && <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>Connect your wallet first</p>}

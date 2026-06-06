@@ -53,7 +53,7 @@ export default function PoolsPage() {
       </div>
 
       {/* Stats bar */}
-      {!loading && pools.length > 0 && (
+      {!loading && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 40, padding: "20px 24px", background: "var(--bg-secondary)", borderRadius: "var(--radius)", border: "1px solid var(--border-subtle)" }}>
           <StatItem label="Total Value Locked" value={totalTVL < 1000 ? `${totalTVL.toFixed(2)} THEO` : `${(totalTVL / 1000).toFixed(1)}k THEO`} />
           <StatItem label="Active Pools" value={`${pools.length}`} center />
@@ -79,9 +79,14 @@ export default function PoolsPage() {
         <div style={{ textAlign: "center", padding: "60px 24px", background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius)" }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🏊</div>
           <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>No Active Pools</h2>
-          <p style={{ color: "var(--text-secondary)", fontSize: 15, marginBottom: 28, maxWidth: 400, margin: "0 auto 28px" }}>
+          <p style={{ color: "var(--text-secondary)", fontSize: 15, marginBottom: 28, maxWidth: 400, margin: "0 auto 16px" }}>
             There are no pools running right now. Create one to start the game — it's permissionless, anyone can do it!
           </p>
+          {rolloverBalance > 0 && (
+            <div style={{ background: "rgba(252,163,17,0.1)", border: "1px solid rgba(252,163,17,0.3)", borderRadius: "var(--radius)", padding: "12px 24px", marginBottom: 24, display: "inline-block" }}>
+              <span style={{ color: "var(--accent)", fontWeight: 700, fontSize: 16 }}>🔄 Next pool will be seeded with {rolloverBalance.toFixed(2)} THEO!</span>
+            </div>
+          )}
           <button className="btn btn-primary" onClick={handleCreatePool} disabled={creating} style={{ padding: "14px 32px", fontSize: 16 }}>
             {creating ? <><span className="spinner" /> Creating Pool…</> : "🆕 Create New Pool"}
           </button>

@@ -33,6 +33,8 @@ export interface UserPosition {
   exitedEarly: boolean;
   claimed: boolean;
   redistributionCollected: boolean;
+  poolTvl: number;
+  penaltyPot: number;
   redistributionPerClaimer: number;
   poolStatus: string;
   lockupEnds?: number;

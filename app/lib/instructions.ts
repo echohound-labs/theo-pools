@@ -150,6 +150,8 @@ export async function getUserPositions(wallet: PublicKey): Promise<UserPosition[
             lockupEnds: pool.endTime,
             redistributionPerClaimer: (poolAcc.redistributionPerClaimer?.toNumber() ?? 0) / DECIMALS,
             poolStatus: pool.status,
+            poolTvl: pool.tvl,
+            penaltyPot: pool.penaltyVaultBalance,
           });
         }
       } catch { }

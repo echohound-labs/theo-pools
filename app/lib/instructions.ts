@@ -310,3 +310,13 @@ export async function getRolloverBalance(): Promise<number> {
     return 0;
   }
 }
+
+export async function getNextPoolId(): Promise<number> {
+  try {
+    const program = getReadonlyProgram();
+    const gs = await (program.account as any).globalState.fetch(PDAs.globalState());
+    return gs.poolCount?.toNumber() ?? 0;
+  } catch {
+    return 0;
+  }
+}

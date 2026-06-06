@@ -4,12 +4,13 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { Pool } from "@/lib/types";
-import { getAllPools, createPool, getRolloverBalance } from "@/lib/instructions";
+import { getAllPools, createPool, getRolloverBalance, getNextPoolId } from "@/lib/instructions";
 import { PoolCard } from "@/components/PoolCard";
 
 export default function PoolsPage() {
   const [pools, setPools] = useState<Pool[]>([]);
   const [rolloverBalance, setRolloverBalance] = useState<number>(0);
+  const [nextPoolId, setNextPoolId] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -20,6 +21,7 @@ export default function PoolsPage() {
   useEffect(() => {
     getAllPools().then((data) => { setPools(data); setLoading(false); });
     getRolloverBalance().then(setRolloverBalance);
+    getNextPoolId().then(setNextPoolId);
   }, []);
 
   const totalTVL = pools.reduce((sum, p) => sum + p.tvl, 0);
@@ -58,6 +60,7 @@ export default function PoolsPage() {
           <StatItem label="Total Value Locked" value={totalTVL < 1000 ? `${totalTVL.toFixed(2)} THEO` : `${(totalTVL / 1000).toFixed(1)}k THEO`} />
           <StatItem label="Active Pools" value={`${pools.length}`} center />
           <StatItem label="Next Pool Seed" value={rolloverBalance > 0 ? `${rolloverBalance.toFixed(2)} THEO` : "0.00 THEO"} />
+          <StatItem label="Next Pool" value={nextPoolId > 0 ? `#${nextPoolId}` : "—"} right />
           <StatItem label="Total Stakers" value={`${totalPlayers.toLocaleString()}`} right />
         </div>
       )}
@@ -84,7 +87,7 @@ export default function PoolsPage() {
           </p>
           {rolloverBalance > 0 && (
             <div style={{ background: "rgba(252,163,17,0.1)", border: "1px solid rgba(252,163,17,0.3)", borderRadius: "var(--radius)", padding: "12px 24px", marginBottom: 24, display: "inline-block" }}>
-              <span style={{ color: "var(--accent)", fontWeight: 700, fontSize: 16 }}>🔄 Next pool will be seeded with {rolloverBalance.toFixed(2)} THEO!</span>
+              <span style={{ color: "var(--accent)", fontWeight: 700, fontSize: 16 }}>🔄 Pool #{nextPoolId} will be seeded with {rolloverBalance.toFixed(2)} THEO!</span>
             </div>
           )}
           <button className="btn btn-primary" onClick={handleCreatePool} disabled={creating} style={{ padding: "14px 32px", fontSize: 16 }}>

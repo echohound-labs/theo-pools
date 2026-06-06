@@ -19,7 +19,7 @@ export default function DashboardPage() {
     setLoading(false);
   }, [publicKey]);
   useEffect(() => { fetchPositions(); }, [fetchPositions]);
-  const totalStaked = positions.reduce((s, p) => s + p.stakedAmount, 0);
+  const totalStaked = positions.filter(p => p.poolStatus === "Active" || p.poolStatus === "Filling").reduce((s, p) => s + p.stakedAmount, 0);
   const totalRewards = positions.filter(p => !p.claimed && !p.exitedEarly && p.lockupEnds && Math.floor(Date.now()/1000) > p.lockupEnds && Math.floor(Date.now()/1000) < p.lockupEnds + 5*24*60*60 && p.poolStatus !== "Finalized" && p.poolStatus !== "Claiming").reduce((s, p) => s + p.claimableRewards, 0);
   if (!publicKey) {
     return (

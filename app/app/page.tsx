@@ -57,7 +57,7 @@ export default function PoolsPage() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 40, padding: "20px 24px", background: "var(--bg-secondary)", borderRadius: "var(--radius)", border: "1px solid var(--border-subtle)" }}>
           <StatItem label="Total Value Locked" value={totalTVL < 1 ? `${totalTVL.toFixed(2)} THEO` : `${(totalTVL / 1000).toFixed(1)}k THEO`} />
           <StatItem label="Active Pools" value={`${pools.length}`} center />
-          <StatItem label="Next Pool Seed" value={rolloverBalance > 0 ? `${rolloverBalance.toFixed(2)} THEO` : "—"} />
+          <StatItem label="Next Pool Seed" value={rolloverBalance > 0 ? `${rolloverBalance.toFixed(2)} THEO` : "0.00 THEO"} />
           <StatItem label="Total Stakers" value={`${totalPlayers.toLocaleString()}`} right />
         </div>
       )}
@@ -138,7 +138,7 @@ function PoolTableRow({ pool, isLast }: { pool: Pool; isLast: boolean }) {
       onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}
       onClick={() => (window.location.href = `/pool/${pool.id}`)}>
       <td style={{ padding: "16px 20px" }}><div style={{ fontWeight: 700, fontSize: 15 }}>{pool.name}</div><div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{pool.playerCount} stakers</div></td>
-      <td style={{ padding: "16px 20px", textAlign: "right", fontWeight: 600 }}>{pool.tvl < 1 ? pool.tvl.toFixed(2) + ' THEO' : (pool.tvl / 1000).toFixed(1) + 'k THEO'}</td>
+      <td style={{ padding: "16px 20px", textAlign: "right", fontWeight: 600 }}>{pool.tvl < 1000 ? pool.tvl.toFixed(2) + ' THEO' : (pool.tvl / 1000).toFixed(1) + 'k THEO'}</td>
       <td style={{ padding: "16px 20px", textAlign: "right", fontWeight: 700, color: "var(--accent)", fontSize: 16 }}>{pool.apr.toFixed(1)}%</td>
       <td style={{ padding: "16px 20px", textAlign: "right", color: "var(--text-secondary)" }}>{pool.minStake} THEO</td>
       <td style={{ padding: "16px 20px", textAlign: "right", color: "var(--text-secondary)" }}>{pool.playerCount.toLocaleString()}</td>

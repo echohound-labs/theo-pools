@@ -104,8 +104,10 @@ export function StakePosition({ position, onRefresh }: StakePositionProps) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
         <StatBox label="Staked" value="0.20" unit="THEO" />
         {!rolledOver && !position.exitedEarly && (
-          <StatBox label="Penalty Pot" value={position.penaltyPot.toFixed(2)} unit="THEO" />
-          <StatBox label="Claimable" value={position.claimed || position.exitedEarly || rolledOver ? "—" : position.claimableRewards.toFixed(4)} unit={position.claimed || position.exitedEarly || rolledOver ? "" : "THEO"} accent />
+          <>
+            <StatBox label="Penalty Pot" value={position.penaltyPot.toFixed(2)} unit="THEO" />
+            <StatBox label="Claimable" value={position.claimed || position.exitedEarly || rolledOver ? "—" : position.claimableRewards.toFixed(4)} unit={position.claimed || position.exitedEarly || rolledOver ? "" : "THEO"} accent />
+          </>
         )}
         {rolledOver && (
           <div style={{ padding: "12px 14px", background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)", gridColumn: "span 1" }}>

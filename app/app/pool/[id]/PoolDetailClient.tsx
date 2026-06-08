@@ -17,7 +17,7 @@ export default function PoolDetailClient() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string; sig?: string } | null>(null);
-  const { publicKey } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
   const { setVisible } = useWalletModal();
 
@@ -42,7 +42,6 @@ export default function PoolDetailClient() {
     try {
       const tx = await fn();
       if (!tx) throw new Error("Failed to build transaction");
-      const { signTransaction } = useWallet();
       const signed = await signTransaction!(tx);
       const sig = await connection.sendRawTransaction(signed.serialize());
       await connection.confirmTransaction(sig, "confirmed");

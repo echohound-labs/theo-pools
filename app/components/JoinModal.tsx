@@ -37,7 +37,7 @@ export function JoinModal({ pool, onClose, onSuccess }: JoinModalProps) {
             instructions: tx.instructions,
           }).compileToV0Message();
           const versionedTx = new VersionedTransaction(message);
-          const result = await x1.signAndSendTransaction(versionedTx);
+          const result = await x1.signAndSendTransaction(versionedTx, { connection });
           sig = typeof result === "string" ? result : result.signature;
         } else {
           sig = await sendTransaction(tx, connection, { skipPreflight: true });

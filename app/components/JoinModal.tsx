@@ -29,11 +29,12 @@ export function JoinModal({ pool, onClose, onSuccess }: JoinModalProps) {
       try {
         sig = await sendTransaction(tx, connection, { skipPreflight: true });
       } catch (sendErr: any) {
-        // tx may have gone through despite error - wait and show success
+        // tx may have gone through despite error - check for sig in error
+        const errSig = sendErr?.signature || sendErr?.txid || null;
         await new Promise(r => setTimeout(r, 3000));
         setError(null);
-        setTxSig("submitted");
         setLoading(false);
+        setTxSig(errSig || "submitted");
         return;
       }
       try {

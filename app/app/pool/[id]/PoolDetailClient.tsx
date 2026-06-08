@@ -48,7 +48,15 @@ export default function PoolDetailClient() {
       try {
         const x1 = (window as any).x1Wallet;
         if (x1?.isConnected && x1?.signAndSendTransaction) {
-          const result = await x1.signAndSendTransaction(tx);
+          const { VersionedTransaction, TransactionMessage } = await import("@solana/web3.js");
+          const { blockhash } = await connection.getLatestBlockhash("confirmed");
+          const message = new TransactionMessage({
+            payerKey: publicKey,
+            recentBlockhash: blockhash,
+            instructions: tx.instructions,
+          }).compileToV0Message();
+          const versionedTx = new VersionedTransaction(message);
+          const result = await x1.signAndSendTransaction(versionedTx);
           sig = typeof result === "string" ? result : result.signature;
         } else {
           sig = await sendTransaction(tx, connection, { skipPreflight: true });

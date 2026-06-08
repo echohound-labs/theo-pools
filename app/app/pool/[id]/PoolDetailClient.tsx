@@ -46,7 +46,13 @@ export default function PoolDetailClient() {
       if (!tx) throw new Error("Failed to build transaction");
       let sig: string | null = null;
       try {
-        sig = await sendTransaction(tx, connection, { skipPreflight: true });
+        const x1 = (window as any).x1Wallet;
+        if (x1?.isConnected && x1?.signAndSendTransaction) {
+          const result = await x1.signAndSendTransaction(tx);
+          sig = typeof result === "string" ? result : result.signature;
+        } else {
+          sig = await sendTransaction(tx, connection, { skipPreflight: true });
+        }
       } catch (sendErr: any) {
         // Wallet may show simulation error even when tx succeeds - check on-chain
         await new Promise(r => setTimeout(r, 3000));

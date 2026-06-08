@@ -27,7 +27,13 @@ export function JoinModal({ pool, onClose, onSuccess }: JoinModalProps) {
       const tx = await joinPool(pool.id, STAKE_AMOUNT, publicKey);
       let sig: string | null = null;
       try {
-        sig = await sendTransaction(tx, connection, { skipPreflight: true });
+        const x1 = (window as any).x1Wallet;
+        if (x1?.isConnected && x1?.signAndSendTransaction) {
+          const result = await x1.signAndSendTransaction(tx);
+          sig = typeof result === "string" ? result : result.signature;
+        } else {
+          sig = await sendTransaction(tx, connection, { skipPreflight: true });
+        }
       } catch {
         // Wallet simulation error - tx may have gone through anyway
         await new Promise(r => setTimeout(r, 3000));

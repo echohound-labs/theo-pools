@@ -31,7 +31,10 @@ export function JoinModal({ pool, onClose, onSuccess }: JoinModalProps) {
       } catch {
         // Wallet simulation error - tx may have gone through anyway
         await new Promise(r => setTimeout(r, 3000));
-        onSuccess?.();
+        setError(null);
+        setTxSig("submitted");
+        setLoading(false);
+        setTimeout(() => onSuccess?.(), 2000);
         return;
       }
       try {

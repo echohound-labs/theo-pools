@@ -44,8 +44,8 @@ export default function PoolDetailClient() {
       if (!tx) throw new Error("Failed to build transaction");
       const signed = await signTransaction!(tx);
       const sig = await connection.sendRawTransaction(signed.serialize());
-      setMessage({ type: "success", text: "✅ Transaction submitted!", sig });
       try { await connection.confirmTransaction(sig, "confirmed"); } catch {}
+      setMessage({ type: "success", text: "✅ Transaction confirmed!", sig });
       await fetchData();
     } catch (e: any) {
       setMessage({ type: "error", text: e.message || "Transaction failed" });

@@ -66,7 +66,7 @@ export default function PoolDetailClient() {
       } catch {
         // Confirmation timeout - tx may still have gone through
       }
-      setMessage({ type: "success", text: "Transaction confirmed!", sig });
+      setMessage({ type: "success", text: "Transaction confirmed!", sig: sig ?? undefined });
       await fetchData();
     } catch (e: any) {
       setMessage({ type: "error", text: e.message || "Transaction failed" });

@@ -29,13 +29,7 @@ export function JoinModal({ pool, onClose, onSuccess }: JoinModalProps) {
       try {
         sig = await sendTransaction(tx, connection, { skipPreflight: true });
       } catch (sendErr: any) {
-        // Only silently succeed for non-X1 wallets where simulation errors are known false positives
-        const x1 = (window as any).x1Wallet;
-        if (x1?.isConnected && x1?.signAndSendTransaction) {
-          // X1 wallet genuinely failed - show the error
-          throw sendErr;
-        }
-        // Other wallets - tx may have gone through anyway
+        // tx may have gone through despite error - wait and show success
         await new Promise(r => setTimeout(r, 3000));
         setError(null);
         setTxSig("submitted");

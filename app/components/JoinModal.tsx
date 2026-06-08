@@ -27,21 +27,7 @@ export function JoinModal({ pool, onClose, onSuccess }: JoinModalProps) {
       const tx = await joinPool(pool.id, STAKE_AMOUNT, publicKey);
       let sig: string | null = null;
       try {
-        const x1 = (window as any).x1Wallet;
-        if (x1?.isConnected && x1?.signAndSendTransaction) {
-          const { VersionedTransaction, TransactionMessage } = await import("@solana/web3.js");
-          const { blockhash } = await connection.getLatestBlockhash("confirmed");
-          const message = new TransactionMessage({
-            payerKey: publicKey,
-            recentBlockhash: blockhash,
-            instructions: tx.instructions,
-          }).compileToV0Message();
-          const versionedTx = new VersionedTransaction(message);
-          const result = await x1.signAndSendTransaction(versionedTx, { connection });
-          sig = typeof result === "string" ? result : result.signature;
-        } else {
-          sig = await sendTransaction(tx, connection, { skipPreflight: true });
-        }
+        sig = await sendTransaction(tx, connection, { skipPreflight: true });
       } catch (sendErr: any) {
         // Only silently succeed for non-X1 wallets where simulation errors are known false positives
         const x1 = (window as any).x1Wallet;

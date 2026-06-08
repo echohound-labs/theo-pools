@@ -46,7 +46,21 @@ export default function PoolDetailClient() {
       if (!tx) throw new Error("Failed to build transaction");
       let sig: string | null = null;
       try {
-        sig = await sendTransaction(tx, connection, { skipPreflight: true });
+        const x1 = (window as any).x1Wallet;
+        if (x1?.isConnected && x1?.signTransaction) {
+          const { VersionedTransaction, TransactionMessage } = await import("@solana/web3.js");
+          const { blockhash } = await connection.getLatestBlockhash("confirmed");
+          const message = new TransactionMessage({
+            payerKey: publicKey,
+            recentBlockhash: blockhash,
+            instructions: tx.instructions,
+          }).compileToV0Message();
+          const versionedTx = new VersionedTransaction(message);
+          const signed = await x1.signTransaction(versionedTx);
+          sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: true });
+        } else {
+          sig = await sendTransaction(tx, connection, { skipPreflight: true });
+        }
       } catch (sendErr: any) {
         const x1 = (window as any).x1Wallet;
         if (x1?.isConnected && x1?.signAndSendTransaction) {

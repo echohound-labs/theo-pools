@@ -51,6 +51,7 @@ export default function PoolDetailClient() {
         // Wallet may show simulation error even when tx succeeds - check on-chain
         await new Promise(r => setTimeout(r, 3000));
         await fetchData();
+        setMessage({ type: "success", text: "Transaction submitted! Refreshing..." });
         return;
       }
       try {

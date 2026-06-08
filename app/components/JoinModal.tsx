@@ -43,7 +43,7 @@ export function JoinModal({ pool, onClose, onSuccess }: JoinModalProps) {
         return;
       }
       try {
-        await connection.confirmTransaction(sig, "confirmed");
+        if (sig) await connection.confirmTransaction(sig, "confirmed");
       } catch {
         // Confirmation timeout - tx may still have gone through
       }

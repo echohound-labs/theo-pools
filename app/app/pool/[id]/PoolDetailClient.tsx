@@ -43,15 +43,11 @@ export default function PoolDetailClient() {
       const tx = await fn();
       if (!tx) throw new Error("Failed to build transaction");
       let sig: string | null = null;
-      try {
-        if (signTransaction) {
-          const signed = await signTransaction(tx);
-          sig = await connection.sendRawTransaction(signed.serialize());
-        } else {
-          sig = await sendTransaction(tx, connection, { skipPreflight: true });
-        }
-      } catch (sendErr: any) {
-        throw sendErr;
+      if (signTransaction) {
+        const signed = await signTransaction(tx);
+        sig = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: true });
+      } else {
+        sig = await sendTransaction(tx, connection, { skipPreflight: true });
       }
       try {
         if (sig) await connection.confirmTransaction(sig, "confirmed");

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { getPoolState, getUserPositions, joinPool, exitPool, claimRewards, withdraw, closeStalledPool, createPool, finalize, sweepEmptyVault } from "@/lib/instructions";
-import { JoinModal } from "@/components/JoinModal";
 import { Countdown } from "@/components/Countdown";
 import { Pool, UserPosition } from "@/lib/types";
 import { PROGRAM_ID } from "@/lib/constants";
@@ -18,7 +17,6 @@ export default function PoolDetailClient() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string; sig?: string } | null>(null);
-  const [showJoin, setShowJoin] = useState(false);
   const { publicKey, sendTransaction, signTransaction } = useWallet();
   const { connection } = useConnection();
   const { setVisible } = useWalletModal();
@@ -177,7 +175,7 @@ export default function PoolDetailClient() {
         <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>Actions</h2>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
           {!publicKey && <button className="btn btn-primary" onClick={() => setVisible(true)}>Connect Wallet</button>}
-          {canJoin && <button className="btn btn-primary" onClick={() => setShowJoin(true)}>💰 Join Pool (0.20 THEO)</button>}
+          {canJoin && <button className="btn btn-primary" disabled={actionLoading === "join"} onClick={() => handleAction("join", () => joinPool(poolId, 0.20, publicKey!))}>{ actionLoading === "join" ? <><span className="spinner" /> Joining…</> : "💰 Join Pool (0.20 THEO)"}</button>}
           {canExit && (
             <button className="btn btn-danger" disabled={actionLoading === "exit"} onClick={() => handleAction("exit", () => exitPool(poolId, publicKey!))}>
               {actionLoading === "exit" ? <><span className="spinner" /> Exiting…</> : "⚡ Exit Early (50% back)"}
@@ -227,7 +225,6 @@ export default function PoolDetailClient() {
         </div>
       </div>
 
-      {showJoin && <JoinModal pool={pool} onClose={() => setShowJoin(false)} onSuccess={() => { setShowJoin(false); fetchData(); }} />}
     </div>
   );
 }

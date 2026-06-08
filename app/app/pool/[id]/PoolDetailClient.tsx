@@ -45,7 +45,10 @@ export default function PoolDetailClient() {
       const tx = await fn();
       if (!tx) throw new Error("Failed to build transaction");
       const sig = await sendTransaction(tx, connection, { skipPreflight: true });
-      await connection.confirmTransaction(sig, "confirmed");
+      await Promise.race([
+        connection.confirmTransaction(sig, "confirmed"),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 30000))
+      ]).catch(e => { if (e.message !== "timeout") throw e; });
       setMessage({ type: "success", text: "Transaction confirmed!", sig });
       await fetchData();
     } catch (e: any) {

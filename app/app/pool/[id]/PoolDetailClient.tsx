@@ -52,6 +52,7 @@ export default function PoolDetailClient() {
         await new Promise(r => setTimeout(r, 3000));
         await fetchData();
         setMessage({ type: "success", text: "Transaction submitted! Refreshing..." });
+        setActionLoading(null);
         return;
       }
       try {

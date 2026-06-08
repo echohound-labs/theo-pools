@@ -14,6 +14,7 @@ export function JoinModal({ pool, onClose, onSuccess }: JoinModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txSig, setTxSig] = useState<string | null>(null);
+  const [blockClose, setBlockClose] = useState(false);
   const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
 
@@ -31,10 +32,12 @@ export function JoinModal({ pool, onClose, onSuccess }: JoinModalProps) {
       } catch (sendErr: any) {
         // tx may have gone through despite error - check for sig in error
         const errSig = sendErr?.signature || sendErr?.txid || null;
+        setBlockClose(true);
         await new Promise(r => setTimeout(r, 3000));
         setError(null);
         setLoading(false);
         setTxSig(errSig || "submitted");
+        setBlockClose(false);
         return;
       }
       try {
@@ -54,7 +57,7 @@ export function JoinModal({ pool, onClose, onSuccess }: JoinModalProps) {
 
   return (
     <>
-      <div onClick={(e) => { e.stopPropagation(); if (!txSig) onClose(); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 200, backdropFilter: "blur(4px)" }} />
+      <div onClick={(e) => { e.stopPropagation(); if (!txSig && !blockClose) onClose(); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 200, backdropFilter: "blur(4px)" }} />
       <div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 201, width: "100%", maxWidth: 480, padding: "0 16px" }}>
         <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-lg)", padding: 32, boxShadow: "var(--shadow)" }}>
           

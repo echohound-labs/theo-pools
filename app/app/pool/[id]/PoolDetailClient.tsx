@@ -62,7 +62,10 @@ export default function PoolDetailClient() {
           sig = await sendTransaction(tx, connection, { skipPreflight: true });
         }
       } catch (sendErr: any) {
-        // Wallet may show simulation error even when tx succeeds - check on-chain
+        const x1 = (window as any).x1Wallet;
+        if (x1?.isConnected && x1?.signAndSendTransaction) {
+          throw sendErr;
+        }
         await new Promise(r => setTimeout(r, 3000));
         await fetchData();
         setMessage({ type: "success", text: "Transaction submitted! Refreshing..." });

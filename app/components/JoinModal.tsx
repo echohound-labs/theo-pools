@@ -34,7 +34,6 @@ export function JoinModal({ pool, onClose, onSuccess }: JoinModalProps) {
         setError(null);
         setTxSig("submitted");
         setLoading(false);
-        setTimeout(() => onSuccess?.(), 2000);
         return;
       }
       try {

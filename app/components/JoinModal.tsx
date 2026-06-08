@@ -15,7 +15,7 @@ export function JoinModal({ pool, onClose, onSuccess }: JoinModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [txSig, setTxSig] = useState<string | null>(null);
   const [blockClose, setBlockClose] = useState(false);
-  const { publicKey, sendTransaction } = useWallet();
+  const { publicKey, sendTransaction, signTransaction } = useWallet();
   const { connection } = useConnection();
 
   const STAKE_AMOUNT = 0.20;
@@ -28,7 +28,12 @@ export function JoinModal({ pool, onClose, onSuccess }: JoinModalProps) {
       const tx = await joinPool(pool.id, STAKE_AMOUNT, publicKey);
       let sig: string | null = null;
       try {
-        sig = await sendTransaction(tx, connection, { skipPreflight: true });
+        if (signTransaction) {
+          const signed = await signTransaction(tx);
+          sig = await connection.sendRawTransaction(signed.serialize());
+        } else {
+          sig = await sendTransaction(tx, connection, { skipPreflight: true });
+        }
       } catch (sendErr: any) {
         // tx may have gone through despite error - check for sig in error
         const errSig = sendErr?.signature || sendErr?.txid || null;

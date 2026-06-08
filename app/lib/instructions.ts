@@ -5,7 +5,7 @@ import { PROGRAM_ID, RPC_ENDPOINT } from "./constants";
 import { Pool, UserPosition } from "./types";
 import IDL from "./idl.json";
 
-const THEO_MINT = new PublicKey("5aXz3n196NK41nSRiM9kS5NGCftmF7vnQFiY8AVFmkkS");
+const THEO_MINT = new PublicKey("8Ehmo8CuTZ11i7AspWzk8pZ16AR6gnW6GJnc654c32iQ");
 const DECIMALS = 100;
 
 // ── Connection & Program ─────────────────────────────────────────

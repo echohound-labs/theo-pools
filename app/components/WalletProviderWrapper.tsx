@@ -5,17 +5,17 @@ import { FC, ReactNode, useMemo } from "react";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
 // @ts-ignore
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
+import { BackpackWalletAdapter } from "@solana/wallet-adapter-backpack";
 import { PhantomWalletAdapter, SolflareWalletAdapter } from "@solana/wallet-adapter-wallets";
 import "@solana/wallet-adapter-react-ui/styles.css";
-
 import { RPC_ENDPOINT } from "@/lib/constants";
 
 export const WalletProviderWrapper: FC<{ children: ReactNode }> = ({ children }) => {
   const wallets = useMemo(() => [
+    new BackpackWalletAdapter(),
     new PhantomWalletAdapter(),
     new SolflareWalletAdapter(),
   ], []);
-
   return (
     // @ts-ignore
     <ConnectionProvider endpoint={RPC_ENDPOINT}>
@@ -27,5 +27,4 @@ export const WalletProviderWrapper: FC<{ children: ReactNode }> = ({ children })
     </ConnectionProvider>
   );
 };
-
 export default WalletProviderWrapper;

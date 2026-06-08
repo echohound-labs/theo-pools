@@ -14,7 +14,7 @@ export function StakePosition({ position, onRefresh }: StakePositionProps) {
   const [claiming, setClaiming] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const { publicKey, sendTransaction, signTransaction } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
 
   const now = Math.floor(Date.now() / 1000);
@@ -31,7 +31,8 @@ export function StakePosition({ position, onRefresh }: StakePositionProps) {
     setMessage(null);
     try {
       const tx = await exitPool(position.poolId, publicKey);
-      const sig = signTransaction ? await connection.sendRawTransaction((await signTransaction(tx)).serialize(), { skipPreflight: true }) : await sendTransaction(tx, connection, { skipPreflight: true });
+      const signed = await signTransaction!(tx);
+      const sig = await connection.sendRawTransaction(signed.serialize());
       await connection.confirmTransaction(sig, "confirmed");
       setMessage({ type: "success", text: "Exited early — 50% returned, 50% to survivors." });
       onRefresh?.();
@@ -48,7 +49,8 @@ export function StakePosition({ position, onRefresh }: StakePositionProps) {
     setMessage(null);
     try {
       const tx = await collectRedistribution(position.poolId, publicKey);
-      const sig = signTransaction ? await connection.sendRawTransaction((await signTransaction(tx)).serialize(), { skipPreflight: true }) : await sendTransaction(tx, connection, { skipPreflight: true });
+      const signed = await signTransaction!(tx);
+      const sig = await connection.sendRawTransaction(signed.serialize());
       await connection.confirmTransaction(sig, "confirmed");
       setMessage({ type: "success", text: `Collected ${position.redistributionPerClaimer.toFixed(4)} THEO redistribution bonus!` });
       onRefresh?.();
@@ -65,7 +67,8 @@ export function StakePosition({ position, onRefresh }: StakePositionProps) {
     setMessage(null);
     try {
       const tx = await claimRewards(position.poolId, publicKey);
-      const sig = signTransaction ? await connection.sendRawTransaction((await signTransaction(tx)).serialize(), { skipPreflight: true }) : await sendTransaction(tx, connection, { skipPreflight: true });
+      const signed = await signTransaction!(tx);
+      const sig = await connection.sendRawTransaction(signed.serialize());
       await connection.confirmTransaction(sig, "confirmed");
       setMessage({ type: "success", text: `Claimed ${position.claimableRewards.toFixed(4)} THEO!` });
       onRefresh?.();

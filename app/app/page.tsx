@@ -14,7 +14,7 @@ export default function PoolsPage() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const { publicKey, sendTransaction, signTransaction } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
   const { setVisible } = useWalletModal();
 
@@ -33,7 +33,8 @@ export default function PoolsPage() {
     setMessage(null);
     try {
       const tx = await createPool(publicKey);
-      const sig = signTransaction ? await connection.sendRawTransaction((await signTransaction(tx)).serialize(), { skipPreflight: true }) : await sendTransaction(tx, connection, { skipPreflight: true });
+      const signed = await signTransaction!(tx);
+      const sig = await connection.sendRawTransaction(signed.serialize());
       await connection.confirmTransaction(sig, "confirmed");
       setMessage("Pool created! Refreshing...");
       const data = await getAllPools();

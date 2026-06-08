@@ -46,6 +46,7 @@ export default function PoolDetailClient() {
       const sig = await connection.sendRawTransaction(signed.serialize());
       try { await connection.confirmTransaction(sig, "confirmed"); } catch {}
       setMessage({ type: "success", text: "✅ Transaction confirmed!", sig });
+      await new Promise(r => setTimeout(r, 2000));
       await fetchData();
     } catch (e: any) {
       setMessage({ type: "error", text: e.message || "Transaction failed" });

@@ -92,7 +92,7 @@ export default function PoolDetailClient() {
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, paddingTop: 24, borderTop: "1px solid var(--border-subtle)", marginBottom: 24 }}>
           {[
-            { label: "Players", value: `${pool.playerCount}/5` },
+            { label: "Players", value: `${pool.playerCount}/${pool.maxPlayers ?? 10}` },
             { label: "Survivors", value: `${pool.survivorCount}` },
             { label: "Penalty Pot", value: `${pool.penaltyVaultBalance.toFixed(2)} THEO`, accent: true },
             { label: "Reward/Survivor", value: pool.rewardPerSurvivor > 0 ? `${pool.rewardPerSurvivor.toFixed(4)} THEO` : "TBD" },

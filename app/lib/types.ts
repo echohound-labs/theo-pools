@@ -6,7 +6,8 @@ export interface Pool {
   description: string;
   tvl: number;         // raw units / 100 for display
   apr: number;
-  minStake: number;    // 0.20 THEO
+  minStake: number;
+  maxPlayers: number;    // 0.20 THEO
   maxStake: number;
   playerCount: number;
   survivorCount: number;

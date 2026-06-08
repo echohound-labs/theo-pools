@@ -54,7 +54,7 @@ export function JoinModal({ pool, onClose, onSuccess }: JoinModalProps) {
 
           {/* Pool info */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24, padding: 16, background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)" }}>
-            <InfoRow label="Players" value={`${pool.playerCount}/5`} />
+            <InfoRow label="Players" value={`${pool.playerCount}/${pool.maxPlayers ?? 10}`} />
             <InfoRow label="Survivors" value={`${pool.survivorCount}`} />
             <InfoRow label="Penalty Pot" value={`${pool.penaltyVaultBalance.toFixed(2)} THEO`} accent />
             <InfoRow label="Status" value={pool.status} />

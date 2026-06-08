@@ -78,6 +78,7 @@ function mapPoolAccount(account: any, poolId: number): Pool {
     tvl: (penaltyRaw + playerCount * 20) / DECIMALS,
     apr,
     minStake: 0.20,
+    maxPlayers: account.maxPlayers ?? 10,
     maxStake: 1000,
     playerCount,
     survivorCount,

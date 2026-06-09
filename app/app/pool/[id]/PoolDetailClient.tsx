@@ -17,6 +17,7 @@ export default function PoolDetailClient() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string; sig?: string } | null>(null);
+  const [successSig, setSuccessSig] = useState<string | null>(null);
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
   const { setVisible } = useWalletModal();
@@ -46,6 +47,7 @@ export default function PoolDetailClient() {
       const sig = await connection.sendRawTransaction(signed.serialize());
       try { await connection.confirmTransaction(sig, "confirmed"); } catch {}
       setMessage({ type: "success", text: "✅ Transaction confirmed!", sig });
+      setSuccessSig(sig);
       await new Promise(r => setTimeout(r, 2000));
       await fetchData();
     } catch (e: any) {
@@ -205,6 +207,16 @@ export default function PoolDetailClient() {
         </div>
       </div>
 
+      {successSig && (
+        <div onClick={() => setSuccessSig(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--success)", borderRadius: "var(--radius-lg)", padding: 40, textAlign: "center", maxWidth: 400 }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🎉</div>
+            <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8, color: "var(--success)" }}>Transaction Confirmed!</h2>
+            <a href={`https://explorer.x1.xyz/tx/${successSig}`} target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontSize: 13, display: "block", marginBottom: 24, wordBreak: "break-all" }}>View on Explorer ↗</a>
+            <button className="btn btn-primary" onClick={() => setSuccessSig(null)} style={{ width: "100%" }}>Done</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -216,6 +228,16 @@ function DetailRow({ label, value, mono, explorer }: { label: string; value: str
       <span style={{ fontSize: 13, color: "var(--text-primary)", fontFamily: mono ? "monospace" : "inherit", wordBreak: "break-all", textAlign: "right" }}>
         {value}{explorer && <a href={explorer} target="_blank" rel="noreferrer" style={{ color: "var(--accent)", marginLeft: 6, fontSize: 11 }}>↗</a>}
       </span>
+      {successSig && (
+        <div onClick={() => setSuccessSig(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--success)", borderRadius: "var(--radius-lg)", padding: 40, textAlign: "center", maxWidth: 400 }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🎉</div>
+            <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 8, color: "var(--success)" }}>Transaction Confirmed!</h2>
+            <a href={`https://explorer.x1.xyz/tx/${successSig}`} target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontSize: 13, display: "block", marginBottom: 24, wordBreak: "break-all" }}>View on Explorer ↗</a>
+            <button className="btn btn-primary" onClick={() => setSuccessSig(null)} style={{ width: "100%" }}>Done</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

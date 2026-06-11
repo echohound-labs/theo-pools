@@ -6,6 +6,7 @@ import { useConnection } from "@solana/wallet-adapter-react";
 import { Pool } from "@/lib/types";
 import { getAllPools, createPool, getRolloverBalance, getNextPoolId } from "@/lib/instructions";
 import { PoolCard } from "@/components/PoolCard";
+import { DisclaimerModal } from "@/components/DisclaimerModal";
 
 export default function PoolsPage() {
   const [pools, setPools] = useState<Pool[]>([]);
@@ -13,6 +14,7 @@ export default function PoolsPage() {
   const [nextPoolId, setNextPoolId] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [showDisclaimer, setShowDisclaimer] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
@@ -48,6 +50,7 @@ export default function PoolsPage() {
 
   return (
     <div>
+      <DisclaimerModal open={showDisclaimer} onClose={() => setShowDisclaimer(false)} />
       {/* Hero */}
       <div style={{ textAlign: "center", padding: "48px 0 40px" }}>
         <div style={{ display: "inline-block", padding: "4px 14px", background: "var(--accent-dim)", border: "1px solid var(--border)", borderRadius: 20, fontSize: 12, fontWeight: 700, color: "var(--accent)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>X1 Mainnet</div>

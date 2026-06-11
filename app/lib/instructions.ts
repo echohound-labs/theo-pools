@@ -71,7 +71,7 @@ function mapPoolAccount(account: any, poolId: number): Pool {
     description: status === "Active"
       ? `Active — ${survivorCount} survivors. Game ends ${new Date(endTime * 1000).toLocaleDateString()}.`
       : status === "Filling"
-      ? `Filling — ${playerCount}/5 players. Stake 0.20 THEO to enter.`
+      ? `Filling — ${playerCount}/${account.maxPlayers ?? 10} players. Stake 0.20 THEO to enter.`
       : status === "Claiming"
       ? `Claim window open! Survivors can claim rewards.`
       : `Pool ${status.toLowerCase()}.`,

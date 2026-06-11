@@ -12,10 +12,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <title>THEO Pools — X1 Testnet Staking</title>
+        <title>THEO Pools — X1 Staking</title>
         <meta
           name="description"
-          content="Stake THEO tokens and earn rewards on X1 Testnet"
+          content="Stake THEO tokens, survive the full duration, and split the penalty pot with other survivors."
         />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />

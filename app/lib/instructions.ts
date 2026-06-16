@@ -75,7 +75,7 @@ function mapPoolAccount(account: any, poolId: number): Pool {
       : status === "Claiming"
       ? `Claim window open! Survivors can claim rewards.`
       : `Pool ${status.toLowerCase()}.`,
-    tvl: (penaltyRaw + playerCount * 20) / DECIMALS,
+    tvl: (penaltyRaw + survivorCount * 20) / DECIMALS,
     apr,
     minStake: 0.20,
     maxPlayers: account.maxPlayers ?? 10,

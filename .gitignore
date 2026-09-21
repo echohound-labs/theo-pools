@@ -18,3 +18,4 @@ app/out/
 wallet*.json
 *.key
 data/
+bot/.env

@@ -6,21 +6,24 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { getUserPositions } from "@/lib/instructions";
 import { StakePosition } from "@/components/StakePosition";
 import { UserPosition } from "@/lib/types";
+import { getPositionState } from "@/lib/positionState";
 export default function DashboardPage() {
   const { publicKey } = useWallet();
   const { setVisible } = useWalletModal();
   const [positions, setPositions] = useState<UserPosition[]>([]);
   const [loading, setLoading] = useState(false);
   const fetchPositions = useCallback(async () => {
-    if (!publicKey) return;
+    if (!publicKey) { setPositions([]); return; }
     setLoading(true);
     const data = await getUserPositions(publicKey);
     setPositions(data);
     setLoading(false);
   }, [publicKey]);
   useEffect(() => { fetchPositions(); }, [fetchPositions]);
-  const totalStaked = positions.filter(p => p.poolStatus === "Active" || p.poolStatus === "Filling").reduce((s, p) => s + p.stakedAmount, 0);
-  const totalRewards = positions.filter(p => !p.claimed && !p.exitedEarly && p.lockupEnds && Math.floor(Date.now()/1000) > p.lockupEnds && Math.floor(Date.now()/1000) < p.lockupEnds + 5*24*60*60 && p.poolStatus !== "Finalized" && p.poolStatus !== "Claiming").reduce((s, p) => s + p.claimableRewards, 0);
+  const totalStaked = positions.filter(p => p.poolStatus === "Active" || p.poolStatus === "Filling" || p.poolStatus === "Closed").reduce((s, p) => s + p.stakedAmount, 0);
+  // Full payout (0.20 stake + penalty share) of every position that can be claimed right now.
+  const nowSecs = Math.floor(Date.now() / 1000);
+  const totalRewards = positions.filter(p => ["claimable", "ended"].includes(getPositionState(p, nowSecs))).reduce((s, p) => s + p.claimableRewards, 0);
   if (!publicKey) {
     return (
       <div style={{ textAlign: "center", padding: "80px 0" }}>
@@ -42,7 +45,7 @@ export default function DashboardPage() {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 32 }}>
         <SummaryCard label="Total Staked" value={`${totalStaked.toLocaleString()}`} unit="THEO" />
-        <SummaryCard label="Claimable Rewards" value={totalRewards.toFixed(4)} unit="THEO" accent />
+        <SummaryCard label="Claimable Now" value={totalRewards.toFixed(2)} unit="THEO" accent />
         <SummaryCard label="Total Positions" value={`${positions.length}`} unit="" />
       </div>
       {loading ? (

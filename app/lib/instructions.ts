@@ -1,7 +1,7 @@
 import { Connection, PublicKey, Transaction, SystemProgram } from "@solana/web3.js";
 import { Program, AnchorProvider, Wallet } from "@coral-xyz/anchor";
 import { TOKEN_2022_PROGRAM_ID, getAssociatedTokenAddress, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { PROGRAM_ID, RPC_ENDPOINT } from "./constants";
+import { PROGRAM_ID, RPC_ENDPOINT, MAX_PLAYERS, STAKE_AMOUNT } from "./constants";
 import { Pool, UserPosition } from "./types";
 import IDL from "./idl.json";
 
@@ -41,8 +41,8 @@ async function ata(player: PublicKey): Promise<PublicKey> {
 
 async function makeTx(player: PublicKey, ix: any): Promise<Transaction> {
   const connection = getConnection();
-  const { blockhash } = await connection.getLatestBlockhash("confirmed");
-  const tx = new Transaction({ recentBlockhash: blockhash, feePayer: player });
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+  const tx = new Transaction({ blockhash, lastValidBlockHeight, feePayer: player });
   tx.add(ix);
   return tx;
 }
@@ -62,8 +62,9 @@ function mapPoolAccount(account: any, poolId: number): Pool {
   const survivorCount = account.survivorCount ?? 0;
   const endTime = account.endTime?.toNumber() ?? 0;
   const penaltyRaw = account.penaltyVaultBalance?.toNumber() ?? 0;
-  const apr = survivorCount > 0 && playerCount > 0
-    ? ((playerCount - survivorCount) / playerCount) * 50
+  // Survivor return on stake so far: penalty pot share / stake (STAKE_AMOUNT = 20 raw units).
+  const returnPct = survivorCount > 0
+    ? (penaltyRaw / (survivorCount * 20)) * 100
     : 0;
   return {
     id: String(poolId),
@@ -71,14 +72,14 @@ function mapPoolAccount(account: any, poolId: number): Pool {
     description: status === "Active"
       ? `Active — ${survivorCount} survivors. Game ends ${new Date(endTime * 1000).toLocaleDateString()}.`
       : status === "Filling"
-      ? `Filling — ${playerCount}/${account.maxPlayers ?? 10} players. Stake 0.20 THEO to enter.`
+      ? `Filling — ${playerCount}/${MAX_PLAYERS} players. Stake 0.20 THEO to enter.`
       : status === "Claiming"
       ? `Claim window open! Survivors can claim rewards.`
       : `Pool ${status.toLowerCase()}.`,
     tvl: (penaltyRaw + survivorCount * 20) / DECIMALS,
-    apr,
+    returnPct,
     minStake: 0.20,
-    maxPlayers: account.maxPlayers ?? 10,
+    maxPlayers: MAX_PLAYERS,
     maxStake: 1000,
     playerCount,
     survivorCount,
@@ -96,7 +97,7 @@ function mapPoolAccount(account: any, poolId: number): Pool {
   };
 }
 
-export async function getAllPools(): Promise<Pool[]> {
+export async function getAllPools(includeEnded = false): Promise<Pool[]> {
   try {
     const program = getReadonlyProgram();
     const globalState = await (program.account as any).globalState.fetch(PDAs.globalState());
@@ -106,7 +107,7 @@ export async function getAllPools(): Promise<Pool[]> {
       try {
         const account = await (program.account as any).pool.fetch(PDAs.pool(i));
         const pool = mapPoolAccount(account, i);
-        if (!["Closed", "Finalized"].includes(pool.status) && i !== 0) pools.push(pool);
+        if ((includeEnded || !["Closed", "Finalized"].includes(pool.status)) && i !== 0) pools.push(pool);
       } catch { }
     }
     return pools;
@@ -116,15 +117,66 @@ export async function getAllPools(): Promise<Pool[]> {
   }
 }
 
+/**
+ * Returns null only when the pool account does not exist.
+ * Network / RPC failures throw, so callers can tell "not found" apart from "couldn't load".
+ */
 export async function getPoolState(poolId: string): Promise<Pool | null> {
-  try {
-    const program = getReadonlyProgram();
-    const account = await (program.account as any).pool.fetch(PDAs.pool(Number(poolId)));
-    return mapPoolAccount(account, Number(poolId));
-  } catch (e) {
-    console.error("getPoolState error:", e);
-    return null;
+  const id = Number(poolId);
+  if (!Number.isSafeInteger(id) || id < 0) return null;
+  const program = getReadonlyProgram();
+  const account = await (program.account as any).pool.fetchNullable(PDAs.pool(id));
+  if (!account) return null;
+  const pool = mapPoolAccount(account, id);
+  if (pool.status === "Closed" && pool.playerCount === 0) {
+    try {
+      const bal = await getConnection().getTokenAccountBalance(PDAs.vault(id));
+      pool.vaultBalance = Number(bal.value.amount) / DECIMALS;
+    } catch (e) {
+      console.error("vault balance fetch failed:", e);
+    }
   }
+  return pool;
+}
+
+function mapPosition(pos: any, poolAcc: any, poolId: number): UserPosition {
+  const pool = mapPoolAccount(poolAcc, poolId);
+  // Penalty share is only frozen on-chain once the pool enters Claiming; estimate floor(P / W) before that.
+  const penaltyRaw = poolAcc.penaltyVaultBalance?.toNumber() ?? 0;
+  const rewardRaw = poolAcc.rewardPerSurvivor?.toNumber() ?? 0;
+  const shareRaw = pool.status === "Active" && pool.survivorCount > 0 ? Math.floor(penaltyRaw / pool.survivorCount) : rewardRaw;
+  return {
+    poolId: String(poolId),
+    poolName: pool.name,
+    stakedAmount: (pos.amount?.toNumber() ?? 0) / DECIMALS,
+    // Full claim payout: stake + penalty share.
+    claimableRewards: STAKE_AMOUNT + shareRaw / DECIMALS,
+    entryTimestamp: pos.depositedAt?.toNumber() ?? 0,
+    exitedEarly: pos.exitedEarly ?? false,
+    claimed: pos.claimed ?? false,
+    withdrewFilling: pos.withdrewFilling ?? false,
+    redistributionCollected: pos.redistributionCollected ?? false,
+    lockupEnds: pool.endTime,
+    claimDeadline: pool.claimDeadline,
+    redistributionPerClaimer: (poolAcc.redistributionPerClaimer?.toNumber() ?? 0) / DECIMALS,
+    poolStatus: pool.status,
+    poolTvl: pool.tvl,
+    penaltyPot: pool.penaltyVaultBalance,
+  };
+}
+
+/**
+ * Single position lookup. Returns null only when the wallet never joined the pool;
+ * positions withdrawn during Filling are returned with withdrewFilling = true
+ * (the account still exists, so that wallet can't rejoin). Network failures throw.
+ */
+export async function getUserPosition(poolId: string, wallet: PublicKey): Promise<UserPosition | null> {
+  const id = Number(poolId);
+  const program = getReadonlyProgram();
+  const pos = await (program.account as any).userPosition.fetchNullable(PDAs.position(id, wallet));
+  if (!pos) return null;
+  const poolAcc = await (program.account as any).pool.fetch(PDAs.pool(id));
+  return mapPosition(pos, poolAcc, id);
 }
 
 export async function getUserPositions(wallet: PublicKey): Promise<UserPosition[]> {
@@ -135,27 +187,14 @@ export async function getUserPositions(wallet: PublicKey): Promise<UserPosition[
     const positions: UserPosition[] = [];
     for (let i = 0; i < poolCount; i++) {
       try {
-        const pos = await (program.account as any).userPosition.fetch(PDAs.position(i, wallet));
-        if (!pos.withdrewFilling) {
+        const pos = await (program.account as any).userPosition.fetchNullable(PDAs.position(i, wallet));
+        if (pos && !pos.withdrewFilling) {
           const poolAcc = await (program.account as any).pool.fetch(PDAs.pool(i));
-          const pool = mapPoolAccount(poolAcc, i);
-          positions.push({
-            poolId: String(i),
-            poolName: pool.name,
-            stakedAmount: (pos.amount?.toNumber() ?? 0) / DECIMALS,
-            claimableRewards: pool.rewardPerSurvivor,
-            entryTimestamp: pos.depositedAt?.toNumber() ?? 0,
-            exitedEarly: pos.exitedEarly ?? false,
-            claimed: pos.claimed ?? false,
-            redistributionCollected: pos.redistributionCollected ?? false,
-            lockupEnds: pool.endTime,
-            redistributionPerClaimer: (poolAcc.redistributionPerClaimer?.toNumber() ?? 0) / DECIMALS,
-            poolStatus: pool.status,
-            poolTvl: pool.tvl,
-            penaltyPot: pool.penaltyVaultBalance,
-          });
+          positions.push(mapPosition(pos, poolAcc, i));
         }
-      } catch { }
+      } catch (e) {
+        console.error(`getUserPositions: pool ${i} failed`, e);
+      }
     }
     return positions;
   } catch (e) {

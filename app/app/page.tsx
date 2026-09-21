@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useConnection } from "@solana/wallet-adapter-react";
@@ -7,25 +8,31 @@ import { Pool } from "@/lib/types";
 import { getAllPools, createPool, getRolloverBalance, getNextPoolId } from "@/lib/instructions";
 import { PoolCard } from "@/components/PoolCard";
 import { DisclaimerModal } from "@/components/DisclaimerModal";
+import { sendAndConfirm } from "@/lib/tx";
 
 export default function PoolsPage() {
-  const [pools, setPools] = useState<Pool[]>([]);
+  const [allPools, setAllPools] = useState<Pool[]>([]);
   const [rolloverBalance, setRolloverBalance] = useState<number>(0);
   const [nextPoolId, setNextPoolId] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
-  const { publicKey, signTransaction } = useWallet();
+  const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
   const { setVisible } = useWalletModal();
 
   useEffect(() => {
-    getAllPools().then((data) => { setPools(data); setLoading(false); });
+    getAllPools(true).then((data) => { setAllPools(data); setLoading(false); });
     getRolloverBalance().then(setRolloverBalance);
     getNextPoolId().then(setNextPoolId);
   }, []);
 
+  const pools = allPools.filter((p) => p.status !== "Closed" && p.status !== "Finalized");
+  // Ended pools stay reachable: players may still need to withdraw (Closed) or collect a bonus (Finalized).
+  const endedPools = allPools.filter((p) => p.status === "Closed" || p.status === "Finalized").reverse();
+  // The program allows only one Filling pool at a time, so creating another would fail.
+  const fillingPool = pools.find((p) => p.status === "Filling");
   const totalTVL = pools.reduce((sum, p) => sum + p.tvl, 0);
   const totalPlayers = pools.reduce((sum, p) => sum + p.playerCount, 0);
 
@@ -35,12 +42,12 @@ export default function PoolsPage() {
     setMessage(null);
     try {
       const tx = await createPool(publicKey);
-      const signed = await signTransaction!(tx);
-      const sig = await connection.sendRawTransaction(signed.serialize());
-      await connection.confirmTransaction(sig, "confirmed");
-      setMessage("Pool created! Refreshing...");
-      const data = await getAllPools();
-      setPools(data);
+      await sendAndConfirm(tx, sendTransaction, connection, "create");
+      const data = await getAllPools(true);
+      setAllPools(data);
+      getRolloverBalance().then(setRolloverBalance);
+      getNextPoolId().then(setNextPoolId);
+      setMessage("Pool created!");
     } catch (e: any) {
       setMessage("Error: " + e.message);
     } finally {
@@ -111,7 +118,7 @@ export default function PoolsPage() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border-subtle)", background: "var(--bg-secondary)" }}>
-                  {["Pool", "TVL", "APR", "Min Stake", "Players", ""].map((h, i) => (
+                  {["Pool", "TVL", "Return", "Min Stake", "Players", ""].map((h, i) => (
                     <th key={i} style={{ padding: "14px 20px", textAlign: i === 0 ? "left" : "right", fontSize: 11, fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</th>
                   ))}
                 </tr>
@@ -129,11 +136,31 @@ export default function PoolsPage() {
 
           {/* Create pool button */}
           <div style={{ textAlign: "center", padding: "24px 0" }}>
-            <button className="btn btn-secondary" onClick={handleCreatePool} disabled={creating} style={{ fontSize: 14 }}>
-              {creating ? <><span className="spinner" /> Creating…</> : "🆕 Create New Pool"}
-            </button>
+            {fillingPool ? (
+              <p style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                <Link href={`/pool/${fillingPool.id}`} style={{ color: "var(--accent)" }}>{fillingPool.name}</Link> is open for players. A new pool can be created once it fills or closes.
+              </p>
+            ) : (
+              <button className="btn btn-secondary" onClick={handleCreatePool} disabled={creating} style={{ fontSize: 14 }}>
+                {creating ? <><span className="spinner" /> Creating…</> : "🆕 Create New Pool"}
+              </button>
+            )}
           </div>
         </>
+      )}
+
+      {!loading && endedPools.length > 0 && (
+        <div style={{ marginTop: 16, marginBottom: 32 }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4, color: "var(--text-secondary)" }}>Ended Pools</h2>
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>Were you in one of these? Open it to withdraw from a closed pool or collect a bonus from a finalized one.</p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {endedPools.map((p) => (
+              <Link key={p.id} href={`/pool/${p.id}`} style={{ padding: "8px 14px", background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "var(--radius-sm)", fontSize: 13, color: "var(--text-secondary)" }}>
+                {p.name} <span style={{ color: "var(--text-muted)", marginLeft: 6 }}>● {p.status}{p.status === "Closed" && p.playerCount > 0 ? ` · ${p.playerCount} to withdraw` : ""}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -154,11 +181,11 @@ function PoolTableRow({ pool, isLast }: { pool: Pool; isLast: boolean }) {
       onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "var(--bg-card-hover)"; }}
       onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}
       onClick={() => (window.location.href = `/pool/${pool.id}`)}>
-      <td style={{ padding: "16px 20px" }}><div style={{ fontWeight: 700, fontSize: 15 }}>{pool.name}</div><div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>{pool.playerCount} stakers</div></td>
+      <td style={{ padding: "16px 20px" }}><div style={{ fontWeight: 700, fontSize: 15 }}>{pool.name}</div><div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>● {pool.status}</div></td>
       <td style={{ padding: "16px 20px", textAlign: "right", fontWeight: 600 }}>{pool.tvl < 1000 ? pool.tvl.toFixed(2) + ' THEO' : (pool.tvl / 1000).toFixed(1) + 'k THEO'}</td>
-      <td style={{ padding: "16px 20px", textAlign: "right", fontWeight: 700, color: "var(--accent)", fontSize: 16 }}>{pool.apr.toFixed(1)}%</td>
+      <td style={{ padding: "16px 20px", textAlign: "right", fontWeight: 700, color: "var(--accent)", fontSize: 16 }}>{pool.returnPct.toFixed(1)}%</td>
       <td style={{ padding: "16px 20px", textAlign: "right", color: "var(--text-secondary)" }}>{pool.minStake} THEO</td>
-      <td style={{ padding: "16px 20px", textAlign: "right", color: "var(--text-secondary)" }}>{pool.playerCount.toLocaleString()}</td>
+      <td style={{ padding: "16px 20px", textAlign: "right", color: "var(--text-secondary)" }}>{pool.playerCount}/{pool.maxPlayers}</td>
       <td style={{ padding: "16px 20px", textAlign: "right" }}><span style={{ padding: "5px 14px", background: "var(--accent-dim)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", fontSize: 13, fontWeight: 600, color: "var(--accent)" }}>View →</span></td>
     </tr>
   );

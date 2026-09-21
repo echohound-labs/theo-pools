@@ -1,7 +1,14 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
+import { Transaction } from "@solana/web3.js";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { exitPool, claimRewards, collectRedistribution } from "@/lib/instructions";
+import { ConfirmExitModal } from "@/components/ConfirmExitModal";
+import { EARLY_EXIT_RETURN } from "@/lib/constants";
+import { TxAction } from "@/lib/errors";
+import { sendAndConfirm } from "@/lib/tx";
+import { getPositionState } from "@/lib/positionState";
 import { UserPosition } from "@/lib/types";
 
 interface StakePositionProps {
@@ -10,83 +17,55 @@ interface StakePositionProps {
 }
 
 export function StakePosition({ position, onRefresh }: StakePositionProps) {
-  const [exiting, setExiting] = useState(false);
-  const [claiming, setClaiming] = useState(false);
-  const [collecting, setCollecting] = useState(false);
+  const [pending, setPending] = useState<TxAction | null>(null);
+  const [confirmExit, setConfirmExit] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const { publicKey, signTransaction } = useWallet();
+  const { publicKey, sendTransaction } = useWallet();
   const { connection } = useConnection();
 
   const now = Math.floor(Date.now() / 1000);
-  const gameEnded = position.lockupEnds ? now > position.lockupEnds : false;
-  const claimWindowEnd = position.lockupEnds ? position.lockupEnds + 5 * 24 * 60 * 60 : 0;
-  const claimWindowClosed = claimWindowEnd > 0 && now > claimWindowEnd;
-  const rolledOver = !position.claimed && !position.exitedEarly && (claimWindowClosed || position.poolStatus === "Finalized" || position.poolStatus === "Claiming");
-  const canExit = !position.exitedEarly && !position.claimed && !gameEnded;
-  const canClaim = !position.claimed && !position.exitedEarly && gameEnded && !claimWindowClosed && !rolledOver;
+  const state = getPositionState(position, now);
+  const gameEnded = position.lockupEnds ? now >= position.lockupEnds : false;
+  const rolledOver = state === "forfeited";
+  // Early exit only exists during the Active lock; Filling/Closed positions withdraw in full from the pool page.
+  const canExit = state === "active" && position.poolStatus === "Active";
+  const canClaim = state === "claimable";
+  const canWithdraw = state === "filling" || state === "withdrawable";
+  const canCollect = state === "claimed" && !position.redistributionCollected && position.redistributionPerClaimer > 0 && position.poolStatus === "Finalized";
+  const busy = pending !== null;
+  const exiting = pending === "exit", claiming = pending === "claim", collecting = pending === "redistribution";
 
-  async function handleExit() {
-    if (!publicKey) return;
-    setExiting(true);
+  async function run(action: TxAction, build: () => Promise<Transaction>, successText: string) {
+    if (!publicKey || busy) return;
+    setPending(action);
     setMessage(null);
     try {
-      const tx = await exitPool(position.poolId, publicKey);
-      const signed = await signTransaction!(tx);
-      const sig = await connection.sendRawTransaction(signed.serialize());
-      await connection.confirmTransaction(sig, "confirmed");
-      setMessage({ type: "success", text: "Exited early — 50% returned, 50% to survivors." });
+      await sendAndConfirm(await build(), sendTransaction, connection, action);
+      setMessage({ type: "success", text: successText });
       onRefresh?.();
     } catch (err: unknown) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Exit failed" });
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Transaction failed" });
     } finally {
-      setExiting(false);
+      setPending(null);
     }
   }
 
-  async function handleCollect() {
-    if (!publicKey) return;
-    setCollecting(true);
-    setMessage(null);
-    try {
-      const tx = await collectRedistribution(position.poolId, publicKey);
-      const signed = await signTransaction!(tx);
-      const sig = await connection.sendRawTransaction(signed.serialize());
-      await connection.confirmTransaction(sig, "confirmed");
-      setMessage({ type: "success", text: `Collected ${position.redistributionPerClaimer.toFixed(4)} THEO redistribution bonus!` });
-      onRefresh?.();
-    } catch (err: unknown) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Collect failed" });
-    } finally {
-      setCollecting(false);
-    }
-  }
-
-  async function handleClaim() {
-    if (!publicKey) return;
-    setClaiming(true);
-    setMessage(null);
-    try {
-      const tx = await claimRewards(position.poolId, publicKey);
-      const signed = await signTransaction!(tx);
-      const sig = await connection.sendRawTransaction(signed.serialize());
-      await connection.confirmTransaction(sig, "confirmed");
-      setMessage({ type: "success", text: `Claimed ${position.claimableRewards.toFixed(4)} THEO!` });
-      onRefresh?.();
-    } catch (err: unknown) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Claim failed" });
-    } finally {
-      setClaiming(false);
-    }
-  }
+  const handleExit = () => run("exit", () => exitPool(position.poolId, publicKey!), `Exited early — ${EARLY_EXIT_RETURN.toFixed(2)} THEO returned, the rest went to survivors.`);
+  const handleCollect = () => run("redistribution", () => collectRedistribution(position.poolId, publicKey!), `Collected ${position.redistributionPerClaimer.toFixed(2)} THEO redistribution bonus!`);
+  const handleClaim = () => run("claim", () => claimRewards(position.poolId, publicKey!), `Claimed ${position.claimableRewards.toFixed(2)} THEO (stake + reward)!`);
 
   // Status badge
-  const badge = position.claimed
+  const badge = state === "claimed"
     ? { label: "✓ Claimed", color: "var(--success)", bg: "rgba(46,204,113,0.1)", border: "rgba(46,204,113,0.3)" }
-    : position.exitedEarly
+    : state === "exited"
     ? { label: "Exited Early", color: "var(--danger)", bg: "rgba(231,76,60,0.1)", border: "rgba(231,76,60,0.3)" }
     : rolledOver
     ? { label: "🔄 Rolled Over", color: "var(--text-muted)", bg: "rgba(255,255,255,0.05)", border: "rgba(255,255,255,0.1)" }
-    : gameEnded
+    : state === "withdrawable"
+    ? { label: "↩️ Withdrawable", color: "var(--accent)", bg: "rgba(252,163,17,0.1)", border: "rgba(252,163,17,0.3)" }
+    : state === "filling"
+    ? { label: "⏳ Filling", color: "var(--accent)", bg: "rgba(252,163,17,0.1)", border: "rgba(252,163,17,0.3)" }
+    : state === "claimable" || state === "ended"
     ? { label: "🏆 Survivor! Claim Now!", color: "var(--success)", bg: "rgba(46,204,113,0.1)", border: "rgba(46,204,113,0.3)" }
     : { label: "🟡 Active", color: "var(--accent)", bg: "rgba(252,163,17,0.1)", border: "rgba(252,163,17,0.3)" };
 
@@ -95,7 +74,7 @@ export function StakePosition({ position, onRefresh }: StakePositionProps) {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <div>
-          <h3 style={{ fontSize: 16, fontWeight: 700 }}>{position.poolName}</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 700 }}><Link href={`/pool/${position.poolId}`}>{position.poolName}</Link></h3>
           <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 2 }}>
             Joined {new Date(position.entryTimestamp * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
           </p>
@@ -105,11 +84,11 @@ export function StakePosition({ position, onRefresh }: StakePositionProps) {
 
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
-        <StatBox label="Staked" value="0.20" unit="THEO" />
+        <StatBox label={state === "exited" ? "Returned" : "Staked"} value={state === "exited" ? EARLY_EXIT_RETURN.toFixed(2) : state === "claimed" || rolledOver ? "—" : position.stakedAmount.toFixed(2)} unit={state === "claimed" || rolledOver ? "" : "THEO"} />
         {!rolledOver && !position.exitedEarly && (
           <>
             <StatBox label="Penalty Pot" value={position.penaltyPot.toFixed(2)} unit="THEO" />
-            <StatBox label="Claimable" value={position.claimed || position.exitedEarly || rolledOver ? "—" : position.claimableRewards.toFixed(4)} unit={position.claimed || position.exitedEarly || rolledOver ? "" : "THEO"} accent />
+            <StatBox label="Claimable" value={canClaim || state === "ended" || state === "active" ? `${state === "active" ? "~" : ""}${position.claimableRewards.toFixed(2)}` : canCollect ? position.redistributionPerClaimer.toFixed(2) : "—"} unit={canClaim || canCollect || state === "ended" || state === "active" ? "THEO" : ""} accent />
           </>
         )}
         {rolledOver && (
@@ -118,7 +97,7 @@ export function StakePosition({ position, onRefresh }: StakePositionProps) {
             <div style={{ fontSize: 13, color: "var(--text-muted)" }}>Seeded next pool</div>
           </div>
         )}
-        <StatBox label="Game Ended" value={position.lockupEnds ? new Date(position.lockupEnds * 1000).toLocaleDateString() : "—"} unit="" />
+        <StatBox label={gameEnded ? "Game Ended" : "Game Ends"} value={position.lockupEnds ? new Date(position.lockupEnds * 1000).toLocaleDateString() : "—"} unit="" />
       </div>
 
       {/* Rolled over explanation */}
@@ -138,19 +117,24 @@ export function StakePosition({ position, onRefresh }: StakePositionProps) {
       {/* Actions */}
       <div style={{ display: "flex", gap: 8 }}>
         {canExit && (
-          <button className="btn btn-danger" onClick={handleExit} disabled={exiting} style={{ flex: 1, fontSize: 13 }}>
+          <button className="btn btn-danger" onClick={() => setConfirmExit(true)} disabled={busy} style={{ flex: 1, fontSize: 13 }}>
             {exiting ? <><span className="spinner" /> Exiting…</> : "⚡ Exit Early (50% back)"}
           </button>
         )}
         {canClaim && (
-          <button className="btn btn-primary" onClick={handleClaim} disabled={claiming} style={{ flex: 1, fontSize: 13 }}>
+          <button className="btn btn-primary" onClick={handleClaim} disabled={busy} style={{ flex: 1, fontSize: 13 }}>
             {claiming ? <><span className="spinner" /> Claiming…</> : "🏆 Claim Rewards"}
           </button>
         )}
-        {position.claimed && !position.redistributionCollected && position.redistributionPerClaimer > 0 && position.poolStatus === "Finalized" && (
-          <button className="btn btn-primary" onClick={handleCollect} disabled={collecting} style={{ flex: 1, fontSize: 13 }}>
+        {canCollect && (
+          <button className="btn btn-primary" onClick={handleCollect} disabled={busy} style={{ flex: 1, fontSize: 13 }}>
             {collecting ? <><span className="spinner" /> Collecting…</> : `🎁 Collect ${position.redistributionPerClaimer.toFixed(2)} THEO bonus`}
           </button>
+        )}
+        {canWithdraw && (
+          <Link href={`/pool/${position.poolId}`} className="btn btn-secondary" style={{ flex: 1, fontSize: 13, textAlign: "center" }}>
+            {state === "withdrawable" ? "↩️ Pool closed — withdraw your full stake →" : "↩️ Manage on pool page (withdraw is free while filling) →"}
+          </Link>
         )}
         {position.claimed && (
           <div style={{ flex: 1, textAlign: "center", padding: "10px", color: "var(--success)", fontSize: 13, fontWeight: 600 }}>✓ Rewards successfully claimed!</div>
@@ -159,6 +143,13 @@ export function StakePosition({ position, onRefresh }: StakePositionProps) {
           <div style={{ flex: 1, textAlign: "center", padding: "10px", color: "var(--text-muted)", fontSize: 13 }}>Exited early — 50% was returned to your wallet</div>
         )}
       </div>
+
+      <ConfirmExitModal
+        open={confirmExit && canExit}
+        poolName={position.poolName}
+        onCancel={() => setConfirmExit(false)}
+        onConfirm={() => { setConfirmExit(false); handleExit(); }}
+      />
     </div>
   );
 }

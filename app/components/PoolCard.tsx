@@ -62,8 +62,8 @@ export function PoolCard({ pool }: PoolCardProps) {
               {pool.description}
             </p>
           </div>
-          <span className="badge badge-green" style={{ marginLeft: 12, flexShrink: 0 }}>
-            ● Active
+          <span className={`badge ${pool.status === "Active" ? "badge-green" : pool.status === "Filling" || pool.status === "Claiming" ? "badge-accent" : ""}`} style={{ marginLeft: 12, flexShrink: 0, ...(pool.status === "Closed" || pool.status === "Finalized" ? { color: "var(--text-muted)", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)" } : {}) }}>
+            ● {pool.status}
           </span>
         </div>
 
@@ -79,13 +79,13 @@ export function PoolCard({ pool }: PoolCardProps) {
         >
           <Stat label="TVL" value={pool.tvl < 1000 ? `${pool.tvl.toFixed(2)}` : `${(pool.tvl / 1000).toFixed(1)}k`} unit="THEO" />
           <Stat
-            label="APR"
-            value={`${pool.apr.toFixed(1)}`}
+            label="Return"
+            value={`${pool.returnPct.toFixed(1)}`}
             unit="%"
             highlight
           />
           <Stat label="Min Stake" value={`${pool.minStake}`} unit="THEO" />
-          <Stat label="Players" value={`${pool.playerCount}`} unit="" />
+          <Stat label="Players" value={`${pool.playerCount}/${pool.maxPlayers}`} unit="" />
         </div>
 
         {/* Join CTA */}

@@ -72,7 +72,7 @@ export default function PoolDetailClient() {
   const canClose = pool.status === "Filling";
   const canFinalize = pool.status === "Claiming" && (claimWindowClosed || pool.claimedCount >= pool.survivorCount);
   const canSweep = pool.status === "Closed" && pool.playerCount === 0;
-  const canCollectRedistribution = hasPosition && position?.claimed && !position?.redistributionCollected && pool.status === "Finalized" && pool.redistributionPerClaimer > 0;
+  const canCollectRedistribution = hasPosition && position?.claimed && !position?.redistributionCollected && pool.status === "Finalized" && (position?.redistributionPerClaimer ?? 0) > 0;
 
   return (
     <div style={{ maxWidth: 820, margin: "0 auto" }}>

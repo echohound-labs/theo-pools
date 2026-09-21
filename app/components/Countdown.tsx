@@ -13,7 +13,8 @@ export function Countdown({ targetTime, label, onComplete }: { targetTime: numbe
     return () => clearInterval(interval);
   }, [targetTime]);
 
-  const hours = Math.floor(timeLeft / 3600);
+  const days = Math.floor(timeLeft / 86400);
+  const hours = Math.floor((timeLeft % 86400) / 3600);
   const mins = Math.floor((timeLeft % 3600) / 60);
   const secs = timeLeft % 60;
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -28,7 +29,8 @@ export function Countdown({ targetTime, label, onComplete }: { targetTime: numbe
     <div style={{ display: "inline-flex", flexDirection: "column", gap: 4 }}>
       <div style={{ fontSize: 11, color: "var(--text-muted)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>{label}</div>
       <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-        {hours > 0 && <><span style={{ fontSize: 24, fontWeight: 800, color: "var(--accent)", fontVariantNumeric: "tabular-nums" }}>{pad(hours)}</span><span style={{ fontSize: 12, color: "var(--text-muted)" }}>h</span></>}
+        {days > 0 && <><span style={{ fontSize: 24, fontWeight: 800, color: "var(--accent)", fontVariantNumeric: "tabular-nums" }}>{days}</span><span style={{ fontSize: 12, color: "var(--text-muted)" }}>d</span></>}
+        {(days > 0 || hours > 0) && <><span style={{ fontSize: 24, fontWeight: 800, color: "var(--accent)", fontVariantNumeric: "tabular-nums" }}>{pad(hours)}</span><span style={{ fontSize: 12, color: "var(--text-muted)" }}>h</span></>}
         <span style={{ fontSize: 24, fontWeight: 800, color: "var(--accent)", fontVariantNumeric: "tabular-nums" }}>{pad(mins)}</span>
         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>m</span>
         <span style={{ fontSize: 24, fontWeight: 800, color: timeLeft < 60 ? "var(--danger)" : "var(--accent)", fontVariantNumeric: "tabular-nums" }}>{pad(secs)}</span>

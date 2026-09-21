@@ -36,6 +36,12 @@ export default function PoolDetailClient() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Poll every 30 seconds to keep pool status fresh
+  useEffect(() => {
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
   async function handleAction(action: string, fn: () => Promise<any>) {
     if (!publicKey) { setVisible(true); return; }
     setActionLoading(action);

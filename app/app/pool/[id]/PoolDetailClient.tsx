@@ -131,16 +131,18 @@ export default function PoolDetailClient() {
                 <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 4 }}>Staked</div>
                 <div style={{ fontWeight: 700 }}>0.20 THEO</div>
               </div>
+{(pool.status === "Claiming" || pool.status === "Finalized" || gameEnded) && (
               <div style={{ padding: 12, background: "var(--bg-secondary)", borderRadius: "var(--radius-sm)" }}>
                 <div style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", marginBottom: 4 }}>Claimable</div>
                 <div style={{ fontWeight: 700, color: "var(--accent)" }}>
                   {position?.exitedEarly ? "—" :
                    position?.claimed ? "—" :
                    pool.rewardPerSurvivor > 0 ? `~${(0.20 + pool.rewardPerSurvivor).toFixed(4)} THEO` :
-                   (pool.status === "Claiming" || gameEnded) && pool.survivorCount > 0 ? `~${(0.20 + Math.floor(pool.penaltyVaultBalance * 100 / pool.survivorCount) / 100).toFixed(2)} THEO` :
-                   "0.20 THEO + rewards"}
+                   pool.survivorCount > 0 ? `~${(0.20 + Math.floor(pool.penaltyVaultBalance * 100 / pool.survivorCount) / 100).toFixed(2)} THEO` :
+                   "—"}
                 </div>
               </div>
+              )}
             </div>
           ) : (
             <p style={{ color: "var(--text-muted)", fontSize: 14 }}>You don&apos;t have a position in this pool.</p>

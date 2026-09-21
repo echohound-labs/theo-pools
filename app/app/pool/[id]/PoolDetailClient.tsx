@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { getPoolState, getUserPositions, joinPool, exitPool, claimRewards, withdraw, closeStalledPool, createPool, finalize, sweepEmptyVault } from "@/lib/instructions";
+import { getPoolState, getUserPositions, joinPool, exitPool, claimRewards, withdraw, closeStalledPool, createPool, finalize, sweepEmptyVault, collectRedistribution } from "@/lib/instructions";
 import { Countdown } from "@/components/Countdown";
 import { Pool, UserPosition } from "@/lib/types";
 import { PROGRAM_ID } from "@/lib/constants";
@@ -67,11 +67,12 @@ export default function PoolDetailClient() {
   const hasPosition = !!position;
   const canJoin = pool.status === "Filling" && !hasPosition;
   const canExit = hasPosition && !position?.exitedEarly && !position?.claimed && pool.status === "Active" && !gameEnded;
-  const canClaim = hasPosition && !position?.exitedEarly && !position?.claimed && (pool.status === "Claiming" || (pool.status === "Active" && gameEnded));
+  const canClaim = hasPosition && !position?.exitedEarly && !position?.claimed && !claimWindowClosed && (pool.status === "Claiming" || (pool.status === "Active" && gameEnded));
   const canWithdraw = hasPosition && (pool.status === "Filling" || pool.status === "Closed");
   const canClose = pool.status === "Filling";
   const canFinalize = pool.status === "Claiming" && (claimWindowClosed || pool.claimedCount >= pool.survivorCount);
   const canSweep = pool.status === "Closed" && pool.playerCount === 0;
+  const canCollectRedistribution = hasPosition && position?.claimed && !position?.redistributionCollected && pool.status === "Finalized" && pool.redistributionPerClaimer > 0;
 
   return (
     <div style={{ maxWidth: 820, margin: "0 auto" }}>
@@ -186,6 +187,11 @@ export default function PoolDetailClient() {
           {canSweep && (
             <button className="btn btn-secondary" disabled={actionLoading === "sweep"} onClick={() => handleAction("sweep", () => sweepEmptyVault(poolId, publicKey!))}>
               {actionLoading === "sweep" ? <><span className="spinner" /> Sweeping…</> : "🧹 Recover Stuck THEO"}
+            </button>
+          )}
+          {canCollectRedistribution && (
+            <button className="btn btn-primary" disabled={actionLoading === "redistribution"} onClick={() => handleAction("redistribution", () => collectRedistribution(poolId, publicKey!))}>
+              {actionLoading === "redistribution" ? <><span className="spinner" /> Collecting…</> : "💎 Collect Bonus Rewards"}
             </button>
           )}
           {publicKey && (

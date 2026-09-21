@@ -69,7 +69,8 @@ export default function PoolDetailClient() {
   const canExit = hasPosition && !position?.exitedEarly && !position?.claimed && pool.status === "Active" && !gameEnded;
   const canClaim = hasPosition && !position?.exitedEarly && !position?.claimed && !claimWindowClosed && (pool.status === "Claiming" || (pool.status === "Active" && gameEnded));
   const canWithdraw = hasPosition && (pool.status === "Filling" || pool.status === "Closed");
-  const canClose = pool.status === "Filling";
+  const fillDeadlinePassed = pool.fillDeadline > 0 && now > pool.fillDeadline;
+  const canClose = pool.status === "Filling" && fillDeadlinePassed;
   const canFinalize = pool.status === "Claiming" && (claimWindowClosed || pool.claimedCount >= pool.survivorCount);
   const canSweep = pool.status === "Closed" && pool.playerCount === 0;
   const canCollectRedistribution = hasPosition && position?.claimed && !position?.redistributionCollected && pool.status === "Finalized" && (position?.redistributionPerClaimer ?? 0) > 0;
@@ -136,7 +137,7 @@ export default function PoolDetailClient() {
                   {position?.exitedEarly ? "—" :
                    position?.claimed ? "—" :
                    pool.rewardPerSurvivor > 0 ? `~${(0.20 + pool.rewardPerSurvivor).toFixed(4)} THEO` :
-                   pool.survivorCount > 0 ? `~${(0.20 + Math.floor(pool.penaltyVaultBalance * 100 / pool.survivorCount) / 100).toFixed(2)} THEO` :
+                   (pool.status === "Claiming" || gameEnded) && pool.survivorCount > 0 ? `~${(0.20 + Math.floor(pool.penaltyVaultBalance * 100 / pool.survivorCount) / 100).toFixed(2)} THEO` :
                    "0.20 THEO + rewards"}
                 </div>
               </div>

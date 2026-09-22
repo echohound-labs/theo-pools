@@ -112,6 +112,87 @@
       "args": []
     },
     {
+      "name": "close_position",
+      "discriminator": [
+        123,
+        134,
+        81,
+        0,
+        49,
+        68,
+        98,
+        98
+      ],
+      "accounts": [
+        {
+          "name": "player",
+          "docs": [
+            "The position owner. Receives the rent refund."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "pool",
+          "docs": [
+            "The Finalized pool."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.id",
+                "account": "Pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_position",
+          "docs": [
+            "Player's position — closed here."
+          ],
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  115,
+                  105,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.id",
+                "account": "Pool"
+              },
+              {
+                "kind": "account",
+                "path": "player"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "close_stalled_pool",
       "discriminator": [
         61,
@@ -583,7 +664,7 @@
         {
           "name": "user_position",
           "docs": [
-            "Player's position in this pool."
+            "Player's position in this pool. Closed here — rent returns to the player."
           ],
           "writable": true,
           "pda": {
@@ -973,7 +1054,7 @@
         {
           "name": "user_position",
           "docs": [
-            "Player's position in this pool."
+            "Player's position in this pool. Closed here — rent returns to the player."
           ],
           "writable": true,
           "pda": {
@@ -1188,6 +1269,19 @@
       ]
     },
     {
+      "name": "PositionClosed",
+      "discriminator": [
+        157,
+        163,
+        227,
+        228,
+        13,
+        97,
+        138,
+        121
+      ]
+    },
+    {
       "name": "RedistributionCollected",
       "discriminator": [
         252,
@@ -1214,34 +1308,34 @@
       ]
     },
     {
-      "name": "RolloverSeeded",
+      "name": "VaultSwept",
       "discriminator": [
-        198,
-        220,
-        236,
-        127,
-        109,
-        72,
-        49,
-        128
+        17,
+        58,
+        171,
+        77,
+        86,
+        94,
+        47,
+        231
       ]
     }
   ],
   "errors": [
     {
       "code": 6000,
-      "name": "PoolNotWithdrawable",
-      "msg": "Pool is not in a withdrawable state (must be Filling or Closed)."
+      "name": "MathOverflow",
+      "msg": "Math overflow or underflow."
     },
     {
       "code": 6001,
-      "name": "NotActiveFillingPool",
-      "msg": "This pool is not the active filling pool."
+      "name": "TimestampOverflow",
+      "msg": "Timestamp arithmetic overflowed."
     },
     {
       "code": 6002,
-      "name": "AlreadyWithdrawn",
-      "msg": "Position has already been withdrawn."
+      "name": "PlayerCountOverflow",
+      "msg": "Player count overflowed."
     },
     {
       "code": 6003,
@@ -1250,18 +1344,168 @@
     },
     {
       "code": 6004,
-      "name": "MathOverflow",
-      "msg": "Math overflow."
-    },
-    {
-      "code": 6005,
       "name": "Unauthorized",
       "msg": "Signer is not the position owner."
     },
     {
-      "code": 6006,
+      "code": 6005,
       "name": "PositionPoolMismatch",
       "msg": "Position does not belong to this pool."
+    },
+    {
+      "code": 6006,
+      "name": "NotActiveFillingPool",
+      "msg": "This pool is not the active filling pool."
+    },
+    {
+      "code": 6007,
+      "name": "InvalidMint",
+      "msg": "Mint account data could not be parsed."
+    },
+    {
+      "code": 6008,
+      "name": "UnsupportedMintExtension",
+      "msg": "Mint uses a Token-2022 extension this program does not support."
+    },
+    {
+      "code": 6009,
+      "name": "MintHasFreezeAuthority",
+      "msg": "Mint has a freeze authority. Vaults could be frozen — refusing this mint."
+    },
+    {
+      "code": 6010,
+      "name": "FillingPoolExists",
+      "msg": "A Filling pool already exists. Only one Filling pool is allowed at a time."
+    },
+    {
+      "code": 6011,
+      "name": "PoolCountOverflow",
+      "msg": "Pool count overflowed u64. This should never happen."
+    },
+    {
+      "code": 6012,
+      "name": "PoolNotFilling",
+      "msg": "Pool is not in Filling state."
+    },
+    {
+      "code": 6013,
+      "name": "FillTimerExpired",
+      "msg": "Fill timer has expired. This pool is stalled."
+    },
+    {
+      "code": 6014,
+      "name": "PoolFull",
+      "msg": "Pool is already full."
+    },
+    {
+      "code": 6015,
+      "name": "PoolNotWithdrawable",
+      "msg": "Pool is not in a withdrawable state (must be Filling or Closed)."
+    },
+    {
+      "code": 6016,
+      "name": "AlreadyWithdrawn",
+      "msg": "Position has already been withdrawn."
+    },
+    {
+      "code": 6017,
+      "name": "PoolNotActive",
+      "msg": "Pool is not in Active state."
+    },
+    {
+      "code": 6018,
+      "name": "LockExpired",
+      "msg": "Lock window has expired. Early exit is no longer available."
+    },
+    {
+      "code": 6019,
+      "name": "AlreadyExited",
+      "msg": "Player has already exited early."
+    },
+    {
+      "code": 6020,
+      "name": "ExitedEarly",
+      "msg": "Player exited early and is not eligible to claim."
+    },
+    {
+      "code": 6021,
+      "name": "WithdrewDuringFilling",
+      "msg": "Player withdrew during Filling and is not eligible to claim."
+    },
+    {
+      "code": 6022,
+      "name": "AlreadyClaimed",
+      "msg": "Player has already claimed their reward."
+    },
+    {
+      "code": 6023,
+      "name": "PoolNotClaiming",
+      "msg": "Pool is not in Claiming state."
+    },
+    {
+      "code": 6024,
+      "name": "ClaimWindowClosed",
+      "msg": "Claim window is closed."
+    },
+    {
+      "code": 6025,
+      "name": "AlreadyFinalized",
+      "msg": "Pool has already been finalized."
+    },
+    {
+      "code": 6026,
+      "name": "ClaimWindowStillOpen",
+      "msg": "Claim window is still open. Cannot finalize yet."
+    },
+    {
+      "code": 6027,
+      "name": "PoolNotFinalized",
+      "msg": "Pool is not in Finalized state."
+    },
+    {
+      "code": 6028,
+      "name": "FinalizedFlagNotSet",
+      "msg": "Pool status is Finalized but finalized flag is not set — invariant violation."
+    },
+    {
+      "code": 6029,
+      "name": "NoRedistributionAvailable",
+      "msg": "No redistribution available -- claimed_count was zero at finalize time."
+    },
+    {
+      "code": 6030,
+      "name": "NotAClaimer",
+      "msg": "Player did not claim during the claim window and is not eligible for redistribution."
+    },
+    {
+      "code": 6031,
+      "name": "AlreadyCollected",
+      "msg": "Player has already collected their redistribution bonus."
+    },
+    {
+      "code": 6032,
+      "name": "FillTimerNotExpired",
+      "msg": "Fill timer has not expired yet. Pool is still active."
+    },
+    {
+      "code": 6033,
+      "name": "PoolNotClosed",
+      "msg": "Pool is not in Closed state."
+    },
+    {
+      "code": 6034,
+      "name": "PoolNotEmpty",
+      "msg": "Pool still has players — use withdraw instead."
+    },
+    {
+      "code": 6035,
+      "name": "VaultAlreadyEmpty",
+      "msg": "Vault is already empty."
+    },
+    {
+      "code": 6036,
+      "name": "RedistributionNotCollected",
+      "msg": "Position still has redistribution to collect. Call collect_redistribution first."
     }
   ],
   "types": [
@@ -1408,7 +1652,8 @@
             "name": "active_filling_pool",
             "docs": [
               "The pool_id of the currently open Filling pool, if any.",
-              "Set when a new pool is created. Cleared when pool goes Active or Closed.",
+              "Set when a new pool is created. Cleared when pool goes Active or Closed",
+              "(deposit, withdraw, close_stalled_pool).",
               "Enforces the single-filling-pool-at-a-time invariant on-chain."
             ],
             "type": {
@@ -1514,7 +1759,7 @@
           {
             "name": "penalty_vault_balance",
             "docs": [
-              "Accumulated penalty tokens from early exits (raw units)."
+              "Reward pot (raw units): rollover seed + accumulated early-exit penalties."
             ],
             "type": "u64"
           },
@@ -1522,7 +1767,8 @@
             "name": "fill_deadline",
             "docs": [
               "Deadline by which the pool must reach MAX_PLAYERS.",
-              "Resets to now + FILL_TIMEOUT on every new join. Zero until first join."
+              "Fixed at creation (= creation time + FILL_TIMEOUT); joins do NOT reset it.",
+              "Legacy pools created before this rule hold 0 until their first join."
             ],
             "type": "i64"
           },
@@ -1612,8 +1858,8 @@
           {
             "name": "finalized",
             "docs": [
-              "Set true after finalize() computes redistribution_per_claimer and redistribution_dust.",
-              "Guards against double-finalization. Must be the first require! check in finalize()."
+              "Set true by finalize(). Always equal to (status == Finalized) — redundant,",
+              "but kept so the account layout stays compatible with already-deployed pools."
             ],
             "type": "bool"
           },
@@ -1655,7 +1901,8 @@
       "docs": [
         "Emitted when a stalled Filling pool is closed.",
         "Via close_stalled_pool: rollover_returned = 0 (no tokens moved).",
-        "Via withdraw (last player): rollover_returned = rollover_seed (tokens returned)."
+        "Via withdraw (last player): rollover_returned = rollover_seed (tokens returned).",
+        "Both can fire for the same pool (close_stalled_pool, then the last withdraw)."
       ],
       "type": {
         "kind": "struct",
@@ -1728,9 +1975,12 @@
     {
       "name": "PoolStatus",
       "docs": [
-        "Strict one-directional lifecycle:",
-        "Filling → Active → Claiming → Finalized",
-        "A stalled Filling pool is closed on last withdrawal (never reaches Active)."
+        "Strict one-directional lifecycle. Two terminal states:",
+        "Filling → Active → Claiming → Finalized      (pool filled)",
+        "Filling → Closed                             (pool stalled)",
+        "A Filling pool whose fill timer expires never reaches Active. It becomes",
+        "Closed via close_stalled_pool, or via the last withdraw after expiry.",
+        "Players withdraw their full stake from a Closed pool at any time."
       ],
       "type": {
         "kind": "enum",
@@ -1749,6 +1999,25 @@
           },
           {
             "name": "Closed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PositionClosed",
+      "docs": [
+        "Emitted when a player closes their position in a Finalized pool."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool_id",
+            "type": "u64"
+          },
+          {
+            "name": "player",
+            "type": "pubkey"
           }
         ]
       }
@@ -1801,25 +2070,6 @@
       }
     },
     {
-      "name": "RolloverSeeded",
-      "docs": [
-        "Defined but not currently emitted — rollover info carried by PoolCreated."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "pool_id",
-            "type": "u64"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
       "name": "UserPosition",
       "docs": [
         "One PDA per (player, pool) pair.",
@@ -1853,7 +2103,8 @@
           {
             "name": "amount",
             "docs": [
-              "Amount deposited. Always STAKE_AMOUNT (0.20 THEO = 20 raw units)."
+              "Stake currently held for this position: STAKE_AMOUNT (20 raw units) after",
+              "deposit, 0 once it has been paid out (claim)."
             ],
             "type": "u64"
           },
@@ -1868,7 +2119,8 @@
             "name": "withdrew_filling",
             "docs": [
               "True if the player withdrew during the Filling phase (no penalty).",
-              "Distinct from exited_early — that flag is strictly for Active-phase exits."
+              "Distinct from exited_early — that flag is strictly for Active-phase exits.",
+              "withdraw now closes the position, so this is only ever true on legacy accounts."
             ],
             "type": "bool"
           },
@@ -1876,7 +2128,7 @@
             "name": "exited_early",
             "docs": [
               "True if the player called early_exit() during the Active window.",
-              "Single source of truth for exit state."
+              "early_exit now closes the position, so this is only ever true on legacy accounts."
             ],
             "type": "bool"
           },
@@ -1901,6 +2153,26 @@
               "PDA bump for [\"position\", pool_id.to_le_bytes(), owner.as_ref()]"
             ],
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "VaultSwept",
+      "docs": [
+        "Emitted when sweep_empty_vault moves a Closed, empty pool's remaining vault",
+        "balance to the GlobalState rollover vault."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "pool_id",
+            "type": "u64"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
           }
         ]
       }

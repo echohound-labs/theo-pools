@@ -107,7 +107,7 @@ export async function getAllPools(includeEnded = false): Promise<Pool[]> {
       try {
         const account = await (program.account as any).pool.fetch(PDAs.pool(i));
         const pool = mapPoolAccount(account, i);
-        if ((includeEnded || !["Closed", "Finalized"].includes(pool.status)) && i !== 0) pools.push(pool);
+        if ((includeEnded || !["Closed", "Finalized"].includes(pool.status)) && i !== 0 && !(pool.status === "Filling" && pool.tvl === 0)) pools.push(pool);
       } catch { }
     }
     return pools;

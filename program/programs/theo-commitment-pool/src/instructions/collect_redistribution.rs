@@ -3,6 +3,7 @@ use anchor_spl::token_interface::{self, Mint, TokenInterface, TokenAccount, Tran
 
 use crate::state::{Pool, PoolStatus, UserPosition};
 use crate::events::RedistributionCollected;
+use crate::errors::ErrorCode;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INSTRUCTION: collect_redistribution
@@ -125,26 +126,4 @@ pub struct CollectRedistribution<'info> {
     pub pool_vault: InterfaceAccount<'info, TokenAccount>,
 
     pub token_program: Interface<'info, TokenInterface>,
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ERRORS
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[error_code]
-pub enum ErrorCode {
-    #[msg("Pool is not in Finalized state.")]
-    PoolNotFinalized,
-    #[msg("Pool status is Finalized but finalized flag is not set — invariant violation.")]
-    FinalizedFlagNotSet,
-    #[msg("No redistribution available -- claimed_count was zero at finalize time.")]
-    NoRedistributionAvailable,
-    #[msg("Player did not claim during the claim window and is not eligible for redistribution.")]
-    NotAClaimer,
-    #[msg("Player has already collected their redistribution bonus.")]
-    AlreadyCollected,
-    #[msg("Signer is not the position owner.")]
-    Unauthorized,
-    #[msg("Position does not belong to this pool.")]
-    PositionPoolMismatch,
 }

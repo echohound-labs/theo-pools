@@ -1,6 +1,19 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{self, Mint, TokenInterface, TokenAccount, TransferChecked};
 use crate::state::{GlobalState, Pool, PoolStatus};
+use crate::errors::ErrorCode;
+use crate::events::VaultSwept;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INSTRUCTION: sweep_empty_vault
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Permissionless. Moves the entire remaining vault balance of a Closed pool
+// with no players (rollover seed of a pool that stalled empty, plus any tokens
+// sent to the vault directly) into the GlobalState rollover vault.
+//
+// Zeroes pool.rollover_seed and pool.penalty_vault_balance so the pool's
+// bookkeeping never claims tokens the vault no longer holds.
 
 pub fn handler(ctx: Context<SweepEmptyVault>) -> Result<()> {
     let pool_ai = ctx.accounts.pool.to_account_info();
@@ -41,6 +54,14 @@ pub fn handler(ctx: Context<SweepEmptyVault>) -> Result<()> {
         .checked_add(vault_balance)
         .ok_or(ErrorCode::MathOverflow)?;
 
+    pool.rollover_seed = 0;
+    pool.penalty_vault_balance = 0;
+
+    emit!(VaultSwept {
+        pool_id: pool.id,
+        amount: vault_balance,
+    });
+
     Ok(())
 }
 
@@ -64,16 +85,4 @@ pub struct SweepEmptyVault<'info> {
     pub rollover_vault: InterfaceAccount<'info, TokenAccount>,
 
     pub token_program: Interface<'info, TokenInterface>,
-}
-
-#[error_code]
-pub enum ErrorCode {
-    #[msg("Pool is not in Closed state.")]
-    PoolNotClosed,
-    #[msg("Pool still has players — use withdraw instead.")]
-    PoolNotEmpty,
-    #[msg("Vault is already empty.")]
-    VaultAlreadyEmpty,
-    #[msg("Math overflow.")]
-    MathOverflow,
 }

@@ -3,6 +3,7 @@ use anchor_spl::token_interface::{self, Mint, TokenInterface, TokenAccount, Tran
 
 use crate::state::{GlobalState, Pool, PoolStatus};
 use crate::events::{ClaimWindowOpened, PoolFinalized};
+use crate::errors::ErrorCode;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INSTRUCTION: finalize_pool
@@ -50,7 +51,7 @@ pub fn handler(ctx: Context<FinalizePool>) -> Result<()> {
             pool.reward_per_survivor = 0;
         }
 
-        emit!(crate::events::ClaimWindowOpened {
+        emit!(ClaimWindowOpened {
             pool_id: pool.id,
             survivor_count: pool.survivor_count,
             penalty_vault_balance: pool.penalty_vault_balance,
@@ -209,20 +210,4 @@ pub struct FinalizePool<'info> {
     pub rollover_vault: InterfaceAccount<'info, TokenAccount>,
 
     pub token_program: Interface<'info, TokenInterface>,
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ERRORS
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[error_code]
-pub enum ErrorCode {
-    #[msg("Pool has already been finalized.")]
-    AlreadyFinalized,
-    #[msg("Pool is not in Claiming state.")]
-    PoolNotClaiming,
-    #[msg("Claim window is still open. Cannot finalize yet.")]
-    ClaimWindowStillOpen,
-    #[msg("Math overflow or underflow.")]
-    MathOverflow,
 }

@@ -4,20 +4,24 @@ use anchor_lang::prelude::*;
 // POOL STATUS
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Strict one-directional lifecycle:
-///   Filling → Active → Claiming → Finalized
-/// A stalled Filling pool is closed on last withdrawal (never reaches Active).
+/// Strict one-directional lifecycle. Two terminal states:
+///   Filling → Active → Claiming → Finalized      (pool filled)
+///   Filling → Closed                             (pool stalled)
+/// A Filling pool whose fill timer expires never reaches Active. It becomes
+/// Closed via close_stalled_pool, or via the last withdraw after expiry.
+/// Players withdraw their full stake from a Closed pool at any time.
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, InitSpace)]
 pub enum PoolStatus {
-    /// Accepting players. Fill timer active. Max 10 players.
+    /// Accepting players. Fill timer running since creation. Max MAX_PLAYERS players.
     Filling,
-    /// 10 players confirmed. 90-day lock in progress.
+    /// MAX_PLAYERS players confirmed. GAME_DURATION lock in progress.
     Active,
-    /// Day 90 reached. 5-day claim window open.
+    /// Lock expired. CLAIM_WINDOW open. Entered lazily by the first claim/finalize.
     Claiming,
     /// Claim window closed. Redistribution done. Pool permanently closed.
     Finalized,
-    /// Pool stalled during Filling and was closed on last withdrawal.
+    /// Pool stalled during Filling (fill timer expired) and was closed.
+    /// Remaining players can still withdraw their full stake.
     Closed,
 }
 
@@ -57,7 +61,8 @@ pub struct GlobalState {
     pub pool_count: u64,
 
     /// The pool_id of the currently open Filling pool, if any.
-    /// Set when a new pool is created. Cleared when pool goes Active or Closed.
+    /// Set when a new pool is created. Cleared when pool goes Active or Closed
+    /// (deposit, withdraw, close_stalled_pool).
     /// Enforces the single-filling-pool-at-a-time invariant on-chain.
     pub active_filling_pool: Option<u64>,
 
@@ -95,11 +100,13 @@ pub struct Pool {
     /// Decrements on each early_exit(). Used for floor(P / W) at claim time.
     pub survivor_count: u8,
 
-    /// Accumulated penalty tokens from early exits (raw units).
+    /// Reward pot (raw units): rollover seed + accumulated early-exit penalties.
     pub penalty_vault_balance: u64,
 
     /// Deadline by which the pool must reach MAX_PLAYERS.
-    /// Resets to now + FILL_TIMEOUT on every new join. Zero until first join.
+    /// Set at creation (= creation time + FILL_TIMEOUT) and reset to
+    /// now + FILL_TIMEOUT on every deposit.
+    /// Legacy pools created before the creation-time rule hold 0 until their first join.
     pub fill_deadline: i64,
 
     /// Unix timestamp when the pool transitioned to Active.
@@ -141,8 +148,8 @@ pub struct Pool {
     /// Rolled into GlobalState.rollover_balance at finalize time. Never silently lost.
     pub redistribution_dust: u64,
 
-    /// Set true after finalize() computes redistribution_per_claimer and redistribution_dust.
-    /// Guards against double-finalization. Must be the first require! check in finalize().
+    /// Set true by finalize(). Always equal to (status == Finalized) — redundant,
+    /// but kept so the account layout stays compatible with already-deployed pools.
     pub finalized: bool,
 
     /// PDA bump for ["pool", id.to_le_bytes()]
@@ -174,7 +181,7 @@ impl Pool {
     #[cfg(feature = "test-fast")]
     pub const CLAIM_WINDOW: i64 = 10;
 
-    /// Fill timeout: 5 days in seconds. Resets on each join.
+    /// Fill timeout: 5 days in seconds, counted from pool creation.
     #[cfg(not(any(feature = "test-fast", feature = "testnet")))]
     pub const FILL_TIMEOUT: i64 = 5 * 24 * 60 * 60;
     #[cfg(feature = "testnet")]
@@ -194,11 +201,6 @@ impl Pool {
     /// Returns true if the fill timer has expired (pool stalled).
     pub fn fill_timer_expired(&self, now: i64) -> bool {
         self.fill_deadline > 0 && now > self.fill_deadline
-    }
-
-    /// Returns true if the pool is in the active lock window.
-    pub fn is_locked(&self, now: i64) -> bool {
-        self.status == PoolStatus::Active && now < self.end_time
     }
 
     /// Returns true if we are inside the claim window.
@@ -236,7 +238,8 @@ pub struct UserPosition {
     /// The pool's numeric ID. Stored for cheap off-chain queries and event logging.
     pub pool_id: u64,
 
-    /// Amount deposited. Always STAKE_AMOUNT (0.20 THEO = 20 raw units).
+    /// Stake currently held for this position: STAKE_AMOUNT (20 raw units) after
+    /// deposit, 0 once it has been paid out (claim).
     pub amount: u64,
 
     /// Unix timestamp of deposit.
@@ -244,10 +247,11 @@ pub struct UserPosition {
 
     /// True if the player withdrew during the Filling phase (no penalty).
     /// Distinct from exited_early — that flag is strictly for Active-phase exits.
+    /// withdraw now closes the position, so this is only ever true on legacy accounts.
     pub withdrew_filling: bool,
 
     /// True if the player called early_exit() during the Active window.
-    /// Single source of truth for exit state.
+    /// early_exit now closes the position, so this is only ever true on legacy accounts.
     pub exited_early: bool,
 
     /// True if the survivor successfully called claim() during the claim window.
@@ -260,18 +264,3 @@ pub struct UserPosition {
     /// PDA bump for ["position", pool_id.to_le_bytes(), owner.as_ref()]
     pub bump: u8,
 }
-
-impl UserPosition {
-    /// A position is claimable iff the player never exited (filling or active) and hasn't claimed yet.
-    pub fn can_claim(&self) -> bool {
-        !self.withdrew_filling && !self.exited_early && !self.claimed
-    }
-
-    /// A position is eligible for redistribution collection iff:
-    /// — player claimed their base reward
-    /// — redistribution not yet collected
-    pub fn can_collect_redistribution(&self) -> bool {
-        self.claimed && !self.redistribution_collected
-    }
-}
-

@@ -2,6 +2,7 @@ use anchor_lang::prelude::*;
 
 use crate::state::{GlobalState, Pool, PoolStatus};
 use crate::events::PoolClosed;
+use crate::errors::ErrorCode;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INSTRUCTION: close_stalled_pool
@@ -10,8 +11,9 @@ use crate::events::PoolClosed;
 // Permissionless escape hatch. Anyone can call this.
 //
 // Purpose:
-//   Handles the edge case where a pool's fill timer has expired but players
-//   have not yet withdrawn. Without this instruction, active_filling_pool
+//   Handles the edge case where a pool's fill timer has expired without the
+//   pool filling — whether players are still inside or it is empty.
+//   Without this instruction, active_filling_pool
 //   would remain set and the protocol would be permanently blocked from
 //   creating new pools.
 //
@@ -30,7 +32,7 @@ use crate::events::PoolClosed;
 //
 // Players must still call withdraw.rs individually to recover their stake.
 // The rollover_seed is returned to GlobalState when the last player withdraws
-// (handled in withdraw.rs auto-close logic).
+// (handled in withdraw.rs), or via sweep_empty_vault if the pool was empty.
 //
 // Bot flow:
 //   Bot polls fill_deadline on a schedule.
@@ -57,24 +59,21 @@ pub fn handler(ctx: Context<CloseStalledPool>) -> Result<()> {
         ErrorCode::NotActiveFillingPool
     );
 
-    // ── Guard 3 & 4: Fill timer expired OR pool is empty (never joined) ─────────
+    // ── Guard 3: Fill timer must have expired ─────────────────────────────────
     //
-    // If no player ever joined (player_count == 0 and fill_deadline == 0),
-    // allow closing immediately — the pool is stuck with a rollover seed
-    // and no way to naturally expire.
-    // Otherwise, require the fill timer to have expired.
-    if pool.player_count == 0 && pool.fill_deadline == 0 {
-        // Pool was never joined — close immediately
-    } else {
-        require!(
-            pool.fill_timer_expired(now),
-            ErrorCode::FillTimerNotExpired
-        );
-        require!(
-            pool.player_count > 0,
-            ErrorCode::PoolAlreadyEmpty
-        );
-    }
+    // fill_deadline is set at pool creation, so every pool — joined or not —
+    // gets the full FILL_TIMEOUT before anyone can close it. An empty expired
+    // pool is closable too; its rollover seed is recovered via sweep_empty_vault.
+    //
+    // Legacy only: pools created before fill_deadline was set at creation have
+    // fill_deadline == 0 until their first join and could never expire, so an
+    // unjoined legacy pool may still be closed immediately. New pools never
+    // have fill_deadline == 0.
+    let legacy_never_joined = pool.fill_deadline == 0 && pool.player_count == 0;
+    require!(
+        legacy_never_joined || pool.fill_timer_expired(now),
+        ErrorCode::FillTimerNotExpired
+    );
 
     // ── Step 1: Close the pool ────────────────────────────────────────────────
     pool.status = PoolStatus::Closed;
@@ -89,8 +88,8 @@ pub fn handler(ctx: Context<CloseStalledPool>) -> Result<()> {
     // ── Step 3: Emit PoolClosed ───────────────────────────────────────────────
     //
     // rollover_returned = 0 here because no tokens are moved.
-    // The actual rollover seed return happens in withdraw.rs when
-    // the last player withdraws (player_count hits 0).
+    // The actual rollover seed return happens in withdraw.rs when the last
+    // player withdraws, or in sweep_empty_vault if the pool was already empty.
     emit!(PoolClosed {
         pool_id: pool.id,
         rollover_returned: 0,
@@ -124,20 +123,4 @@ pub struct CloseStalledPool<'info> {
         bump = pool.bump,
     )]
     pub pool: Account<'info, Pool>,
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ERRORS
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[error_code]
-pub enum ErrorCode {
-    #[msg("Pool is not in Filling state.")]
-    PoolNotFilling,
-    #[msg("This pool is not the active filling pool.")]
-    NotActiveFillingPool,
-    #[msg("Fill timer has not expired yet. Pool is still active.")]
-    FillTimerNotExpired,
-    #[msg("Pool is already empty — withdraw.rs already closed it.")]
-    PoolAlreadyEmpty,
 }

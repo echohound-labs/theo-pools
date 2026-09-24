@@ -43,7 +43,7 @@ describe("Grand Finale: Everything — Withdraw, Exits, Rollovers, Dust, Stalled
   const connection = provider.connection;
   const authority = provider.wallet as anchor.Wallet;
 
-  const players: Keypair[] = Array.from({ length: 24 }, () => Keypair.generate());
+  const players: Keypair[] = Array.from({ length: 25 }, () => Keypair.generate());
   let tokenAccounts: PublicKey[] = [];
   let tokenMint: PublicKey;
   let globalStatePDA: PublicKey;
@@ -138,20 +138,30 @@ describe("Grand Finale: Everything — Withdraw, Exits, Rollovers, Dust, Stalled
     console.log("✓ Player 0 withdrew | got back 0.20 THEO | balance: " + Number(balAfter)/100 + " THEO");
   });
 
-  it("5. Pool 0: player 0 cannot rejoin same pool", async () => {
+  it("5. Pool 0: withdraw closed the position — player 0 can rejoin, fill deadline resets on join", async () => {
     const pool0PDA = getPDA([Buffer.from("pool"), poolIdBytes(0)], program.programId);
     const vault0PDA = getPDA([Buffer.from("vault"), poolIdBytes(0)], program.programId);
     const posPDA = getPDA([Buffer.from("position"), poolIdBytes(0), players[0].publicKey.toBuffer()], program.programId);
-    try {
-      await program.methods.deposit().accounts({
-        player: players[0].publicKey, globalState: globalStatePDA, pool: pool0PDA, userPosition: posPDA,
-        tokenMint, playerTokenAccount: tokenAccounts[0], poolVault: vault0PDA, tokenProgram: TOKEN_2022_PROGRAM_ID, systemProgram: SystemProgram.programId,
-      } as any).signers([players[0]]).rpc().then((s: string) => confirmTx(connection, s));
-      assert.fail("Should not be able to rejoin!");
-    } catch (err: any) {
-      console.log("✓ Player 0 correctly blocked from rejoining");
-      console.log("  Error: " + (err.error?.errorCode?.code || err.message?.split("\n")[0]));
-    }
+    assert.isNull(await connection.getAccountInfo(posPDA, "confirmed"), "position should be closed after withdraw");
+    const deadlineBefore = (await program.account.pool.fetch(pool0PDA)).fillDeadline.toString();
+    assert.notEqual(deadlineBefore, "0", "fill deadline must be set at pool creation");
+    await program.methods.deposit().accounts({
+      player: players[0].publicKey, globalState: globalStatePDA, pool: pool0PDA, userPosition: posPDA,
+      tokenMint, playerTokenAccount: tokenAccounts[0], poolVault: vault0PDA, tokenProgram: TOKEN_2022_PROGRAM_ID, systemProgram: SystemProgram.programId,
+    } as any).signers([players[0]]).rpc().then((s: string) => confirmTx(connection, s));
+    let pool0 = await program.account.pool.fetch(pool0PDA);
+    assert.equal(pool0.playerCount, 5);
+    assert.isTrue(pool0.fillDeadline.gte(new anchor.BN(deadlineBefore)), "joins must reset the fill deadline forward");
+    // Leave again so the following tests see 4 players.
+    await program.methods.withdraw().accounts({
+      player: players[0].publicKey, globalState: globalStatePDA, pool: pool0PDA, userPosition: posPDA,
+      tokenMint, playerTokenAccount: tokenAccounts[0], poolVault: vault0PDA,
+      rolloverVault: rolloverVaultPDA, tokenProgram: TOKEN_2022_PROGRAM_ID, systemProgram: SystemProgram.programId,
+    } as any).signers([players[0]]).rpc().then((s: string) => confirmTx(connection, s));
+    pool0 = await program.account.pool.fetch(pool0PDA);
+    assert.equal(pool0.playerCount, 4);
+    assert.equal(await bal(connection, tokenAccounts[0]), PLAYER_START);
+    console.log("✓ Player 0 rejoined and left again | fill deadline reset on join");
   });
 
   it("6. Pool 0: 6 more players deposit → pool goes Active", async () => {
@@ -369,8 +379,98 @@ describe("Grand Finale: Everything — Withdraw, Exits, Rollovers, Dust, Stalled
     console.log("All instructions tested: initialize, create_pool, deposit, withdraw,");
     console.log("early_exit, claim, finalize, close_stalled_pool");
     console.log("Dust chain: Pool 0 → Pool 1 → Pool 2 ✓");
-    console.log("Anti-griefing rejoin block confirmed ✓");
+    console.log("Fill deadline reset on join + rejoin after withdraw confirmed ✓");
     console.log("Stalled pool lifecycle confirmed ✓");
     console.log("Zero leakage across all pools ✓");
+  });
+
+  // ── Pool 3: fresh-pool griefing, empty stalled pool, sweep, close_position ──
+
+  async function expectError(p: Promise<any>, code: string) {
+    try { await p; } catch (err: any) {
+      const got = err.error?.errorCode?.code || err.message;
+      assert.include(String(got), code);
+      return;
+    }
+    assert.fail("expected " + code);
+  }
+
+  it("17. Pool 3: a fresh, never-joined pool cannot be closed before its fill deadline", async () => {
+    const pool3PDA = getPDA([Buffer.from("pool"), poolIdBytes(3)], program.programId);
+    const vault3PDA = getPDA([Buffer.from("vault"), poolIdBytes(3)], program.programId);
+    await program.methods.createPool().accounts({
+      creator: authority.publicKey, globalState: globalStatePDA, pool: pool3PDA, tokenMint,
+      rolloverVault: rolloverVaultPDA, poolVault: vault3PDA, tokenProgram: TOKEN_2022_PROGRAM_ID, systemProgram: SystemProgram.programId,
+    } as any).rpc().then((s: string) => confirmTx(connection, s));
+    const pool3 = await program.account.pool.fetch(pool3PDA);
+    assert.notEqual(pool3.fillDeadline.toString(), "0");
+    await expectError(program.methods.closeStalledPool().accounts({
+      caller: authority.publicKey, globalState: globalStatePDA, pool: pool3PDA,
+    } as any).rpc(), "FillTimerNotExpired");
+    console.log("✓ Fresh pool protected from immediate close");
+  });
+
+  it("18. Pool 3: lone player joins and leaves — pool stays Filling", async () => {
+    const pool3PDA = getPDA([Buffer.from("pool"), poolIdBytes(3)], program.programId);
+    const vault3PDA = getPDA([Buffer.from("vault"), poolIdBytes(3)], program.programId);
+    const posPDA = getPDA([Buffer.from("position"), poolIdBytes(3), players[24].publicKey.toBuffer()], program.programId);
+    await program.methods.deposit().accounts({
+      player: players[24].publicKey, globalState: globalStatePDA, pool: pool3PDA, userPosition: posPDA,
+      tokenMint, playerTokenAccount: tokenAccounts[24], poolVault: vault3PDA, tokenProgram: TOKEN_2022_PROGRAM_ID, systemProgram: SystemProgram.programId,
+    } as any).signers([players[24]]).rpc().then((s: string) => confirmTx(connection, s));
+    await program.methods.withdraw().accounts({
+      player: players[24].publicKey, globalState: globalStatePDA, pool: pool3PDA, userPosition: posPDA,
+      tokenMint, playerTokenAccount: tokenAccounts[24], poolVault: vault3PDA,
+      rolloverVault: rolloverVaultPDA, tokenProgram: TOKEN_2022_PROGRAM_ID, systemProgram: SystemProgram.programId,
+    } as any).signers([players[24]]).rpc().then((s: string) => confirmTx(connection, s));
+    const pool3 = await program.account.pool.fetch(pool3PDA);
+    const gs = await program.account.globalState.fetch(globalStatePDA);
+    assert.deepEqual(pool3.status, { filling: {} });
+    assert.equal(pool3.playerCount, 0);
+    assert.equal(gs.activeFillingPool.toString(), "3");
+    assert.equal(await bal(connection, vault3PDA), P2_SEED);
+    console.log("✓ Pool 3 still Filling after lone join + leave | seed still in vault");
+  });
+
+  it("19. Pool 3: expires empty → close_stalled_pool → sweep_empty_vault recovers seed", async () => {
+    const pool3PDA = getPDA([Buffer.from("pool"), poolIdBytes(3)], program.programId);
+    const vault3PDA = getPDA([Buffer.from("vault"), poolIdBytes(3)], program.programId);
+    console.log("  Waiting 62s for fill timer to expire...");
+    await sleep(62000);
+    await program.methods.closeStalledPool().accounts({
+      caller: authority.publicKey, globalState: globalStatePDA, pool: pool3PDA,
+    } as any).rpc().then((s: string) => confirmTx(connection, s));
+    await program.methods.sweepEmptyVault().accounts({
+      caller: authority.publicKey, globalState: globalStatePDA, pool: pool3PDA, tokenMint,
+      poolVault: vault3PDA, rolloverVault: rolloverVaultPDA, tokenProgram: TOKEN_2022_PROGRAM_ID,
+    } as any).rpc().then((s: string) => confirmTx(connection, s));
+    const pool3 = await program.account.pool.fetch(pool3PDA);
+    const gs = await program.account.globalState.fetch(globalStatePDA);
+    assert.deepEqual(pool3.status, { closed: {} });
+    assert.equal(pool3.rolloverSeed.toString(), "0");
+    assert.equal(pool3.penaltyVaultBalance.toString(), "0");
+    assert.equal(await bal(connection, vault3PDA), 0n);
+    assert.equal(gs.rolloverBalance.toString(), P2_SEED.toString());
+    assert.equal(await bal(connection, rolloverVaultPDA), P2_SEED);
+    assert.isNull(gs.activeFillingPool);
+    console.log("✓ Pool 3 closed + swept | rollover = " + gs.rolloverBalance + " raw | pool bookkeeping zeroed");
+  });
+
+  it("20. Positions: closed by early_exit; claimers close theirs after finalize", async () => {
+    const pool1PDA = getPDA([Buffer.from("pool"), poolIdBytes(1)], program.programId);
+    const exitedPos = getPDA([Buffer.from("position"), poolIdBytes(1), players[11].publicKey.toBuffer()], program.programId);
+    assert.isNull(await connection.getAccountInfo(exitedPos, "confirmed"), "early_exit should close the position");
+    const claimer = players[20];
+    const claimedPos = getPDA([Buffer.from("position"), poolIdBytes(1), claimer.publicKey.toBuffer()], program.programId);
+    const pos = await program.account.userPosition.fetch(claimedPos);
+    assert.isTrue(pos.claimed);
+    assert.equal(pos.amount.toString(), "0", "claim should zero position.amount");
+    const lamportsBefore = await connection.getBalance(claimer.publicKey, "confirmed");
+    await program.methods.closePosition().accounts({
+      player: claimer.publicKey, pool: pool1PDA, userPosition: claimedPos,
+    } as any).signers([claimer]).rpc().then((s: string) => confirmTx(connection, s));
+    assert.isNull(await connection.getAccountInfo(claimedPos, "confirmed"));
+    assert.isAbove(await connection.getBalance(claimer.publicKey, "confirmed"), lamportsBefore);
+    console.log("✓ Position rent recovered via close_position");
   });
 });

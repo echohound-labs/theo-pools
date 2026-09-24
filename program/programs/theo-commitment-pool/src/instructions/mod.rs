@@ -8,3 +8,4 @@ pub mod finalize;
 pub mod collect_redistribution;
 pub mod close_stalled_pool;
 pub mod sweep_empty_vault;
+pub mod close_position;

@@ -3,6 +3,7 @@ use anchor_spl::token_interface::{self, Mint, TokenInterface, TokenAccount, Tran
 
 use crate::state::{GlobalState, Pool, PoolStatus, UserPosition};
 use crate::events::{FillingWithdraw, PoolClosed};
+use crate::errors::ErrorCode;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INSTRUCTION: withdraw
@@ -15,15 +16,19 @@ use crate::events::{FillingWithdraw, PoolClosed};
 //   1. Validates pool is in Filling state.
 //   2. Validates player has an active position in this pool.
 //   3. Transfers STAKE_AMOUNT from pool vault → player token account.
-//   4. Marks position as withdrawn (withdrew_filling = true, amount = 0).
+//   4. Closes the UserPosition account — rent is refunded to the player and
+//      the player may rejoin the pool later (deposit re-inits the PDA).
 //   5. Decrements pool.player_count and pool.survivor_count.
-//   6. If player_count hits 0:
+//   6. If player_count hits 0 AND the pool is stalled (fill timer expired) or
+//      already Closed:
 //      — Pool is stalled and empty. Auto-close it.
 //      — Transfer rollover_seed back to GlobalState rollover vault.
 //      — Update GlobalState.rollover_balance.
 //      — Set pool.status = Closed.
 //      — Clear GlobalState.active_filling_pool.
 //      — Emit PoolClosed.
+//      An empty pool whose fill timer is still running stays open, so a lone
+//      player joining and leaving cannot kill a fresh pool.
 //   7. Emits FillingWithdraw.
 //
 // PDA seeds:
@@ -41,6 +46,7 @@ pub fn handler(ctx: Context<Withdraw>) -> Result<()> {
     let pool = &mut ctx.accounts.pool;
     let global = &mut ctx.accounts.global_state;
     let position = &mut ctx.accounts.user_position;
+    let now = Clock::get()?.unix_timestamp;
 
     // ── Guard 1: Pool must be Filling or Closed ───────────────────────────────
     require!(
@@ -84,6 +90,9 @@ pub fn handler(ctx: Context<Withdraw>) -> Result<()> {
     )?;
 
     // ── Step 2: Mark position as withdrawn ────────────────────────────────────
+    //
+    // The account is closed on exit (`close = player`), which is what actually
+    // prevents a second withdrawal. The flags are set anyway for defense in depth.
     position.withdrew_filling = true;
     position.amount = 0;
 
@@ -93,8 +102,13 @@ pub fn handler(ctx: Context<Withdraw>) -> Result<()> {
     pool.survivor_count = pool.survivor_count.checked_sub(1)
         .ok_or(ErrorCode::CountUnderflow)?;
 
-    // ── Step 4: Check if pool is now empty → auto-close ──────────────────────
-    let pool_closed = pool.player_count == 0;
+    // ── Step 4: Check if pool is now empty AND stalled → auto-close ──────────
+    //
+    // An empty Filling pool whose timer is still running stays open for new
+    // joiners. Once the timer expires, close_stalled_pool + sweep_empty_vault
+    // retire it and recover the rollover seed.
+    let pool_closed = pool.player_count == 0
+        && (pool.status == PoolStatus::Closed || pool.fill_timer_expired(now));
 
     if pool_closed {
         let rollover_seed = pool.rollover_seed;
@@ -120,6 +134,7 @@ pub fn handler(ctx: Context<Withdraw>) -> Result<()> {
                 .ok_or(ErrorCode::MathOverflow)?;
 
             pool.rollover_seed = 0;
+            pool.penalty_vault_balance = 0;
         }
 
         if pool.status == PoolStatus::Filling {
@@ -160,7 +175,7 @@ pub struct Withdraw<'info> {
         seeds = [b"global"],
         bump = global_state.bump,
     )]
-    pub global_state: Account<'info, GlobalState>,
+    pub global_state: Box<Account<'info, GlobalState>>,
 
     /// The Filling pool the player is withdrawing from.
     #[account(
@@ -168,21 +183,22 @@ pub struct Withdraw<'info> {
         seeds = [b"pool", pool.id.to_le_bytes().as_ref()],
         bump = pool.bump,
     )]
-    pub pool: Account<'info, Pool>,
+    pub pool: Box<Account<'info, Pool>>,
 
-    /// Player's position in this pool.
+    /// Player's position in this pool. Closed here — rent returns to the player.
     #[account(
         mut,
+        close = player,
         seeds = [b"position", pool.id.to_le_bytes().as_ref(), player.key().as_ref()],
         bump = user_position.bump,
         constraint = user_position.owner == player.key() @ ErrorCode::Unauthorized,
         constraint = user_position.pool_id == pool.id @ ErrorCode::PositionPoolMismatch,
     )]
-    pub user_position: Account<'info, UserPosition>,
+    pub user_position: Box<Account<'info, UserPosition>>,
 
     /// Token mint — needed for transfer_checked.
     #[account(address = global_state.token_mint)]
-    pub token_mint: InterfaceAccount<'info, Mint>,
+    pub token_mint: Box<InterfaceAccount<'info, Mint>>,
 
     /// Player's token account — destination of the returned stake.
     #[account(
@@ -191,7 +207,7 @@ pub struct Withdraw<'info> {
         token::authority = player,
         token::token_program = token_program,
     )]
-    pub player_token_account: InterfaceAccount<'info, TokenAccount>,
+    pub player_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Pool vault — source of the stake return.
     #[account(
@@ -201,7 +217,7 @@ pub struct Withdraw<'info> {
         token::token_program = token_program,
         address = pool.vault,
     )]
-    pub pool_vault: InterfaceAccount<'info, TokenAccount>,
+    pub pool_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     /// Global rollover vault — receives rollover_seed if pool auto-closes.
     #[account(
@@ -211,30 +227,8 @@ pub struct Withdraw<'info> {
         token::token_program = token_program,
         address = global_state.rollover_vault,
     )]
-    pub rollover_vault: InterfaceAccount<'info, TokenAccount>,
+    pub rollover_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ERRORS
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[error_code]
-pub enum ErrorCode {
-    #[msg("Pool is not in a withdrawable state (must be Filling or Closed).")]
-    PoolNotWithdrawable,
-    #[msg("This pool is not the active filling pool.")]
-    NotActiveFillingPool,
-    #[msg("Position has already been withdrawn.")]
-    AlreadyWithdrawn,
-    #[msg("Player count underflowed.")]
-    CountUnderflow,
-    #[msg("Math overflow.")]
-    MathOverflow,
-    #[msg("Signer is not the position owner.")]
-    Unauthorized,
-    #[msg("Position does not belong to this pool.")]
-    PositionPoolMismatch,
 }

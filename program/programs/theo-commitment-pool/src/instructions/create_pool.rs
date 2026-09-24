@@ -3,6 +3,7 @@ use anchor_spl::token_interface::{self, Mint, TokenInterface, TokenAccount, Tran
 
 use crate::state::{GlobalState, Pool, PoolStatus};
 use crate::events::PoolCreated;
+use crate::errors::ErrorCode;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INSTRUCTION: create_pool
@@ -12,7 +13,8 @@ use crate::events::PoolCreated;
 //
 // What it does:
 //   1. Derives the next pool PDA using GlobalState.pool_count as the id.
-//   2. Initializes the Pool account with default state (Filling).
+//   2. Initializes the Pool account with default state (Filling) and sets
+//      fill_deadline = now + FILL_TIMEOUT (each deposit resets it again).
 //   3. Atomically transfers the entire GlobalState rollover balance into
 //      the new pool's vault (the rollover seed).
 //   4. Resets GlobalState.rollover_balance to zero.
@@ -31,6 +33,7 @@ pub fn handler(ctx: Context<CreatePool>) -> Result<()> {
     let mint_ai = ctx.accounts.token_mint.to_account_info();
     let global = &mut ctx.accounts.global_state;
     let pool = &mut ctx.accounts.pool;
+    let now = Clock::get()?.unix_timestamp;
 
     // ── Guard: enforce single filling pool invariant ──────────────────────────
     require!(global.active_filling_pool.is_none(), ErrorCode::FillingPoolExists);
@@ -51,7 +54,12 @@ pub fn handler(ctx: Context<CreatePool>) -> Result<()> {
     pool.penalty_vault_balance = 0;
 
     // ── Step 4: Initialize timestamps ────────────────────────────────────────
-    pool.fill_deadline = 0;
+    //
+    // The initial fill deadline is set at creation so a freshly created pool
+    // cannot be closed before players had FILL_TIMEOUT to join. Each deposit
+    // then resets it (see deposit.rs).
+    pool.fill_deadline = now.checked_add(Pool::FILL_TIMEOUT)
+        .ok_or(ErrorCode::TimestampOverflow)?;
     pool.start_time = 0;
     pool.end_time = 0;
     pool.claim_deadline = 0;
@@ -103,7 +111,7 @@ pub fn handler(ctx: Context<CreatePool>) -> Result<()> {
     emit!(PoolCreated {
         pool_id,
         rollover_seed: seed_amount,
-        fill_deadline: 0,
+        fill_deadline: pool.fill_deadline,
     });
 
     Ok(())
@@ -165,16 +173,4 @@ pub struct CreatePool<'info> {
 
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ERRORS
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[error_code]
-pub enum ErrorCode {
-    #[msg("A Filling pool already exists. Only one Filling pool is allowed at a time.")]
-    FillingPoolExists,
-    #[msg("Pool count overflowed u64. This should never happen.")]
-    PoolCountOverflow,
 }

@@ -85,6 +85,7 @@ pub struct PoolFinalized {
 /// Emitted when a stalled Filling pool is closed.
 /// Via close_stalled_pool: rollover_returned = 0 (no tokens moved).
 /// Via withdraw (last player): rollover_returned = rollover_seed (tokens returned).
+/// Both can fire for the same pool (close_stalled_pool, then the last withdraw).
 #[event]
 pub struct PoolClosed {
     pub pool_id: u64,
@@ -99,15 +100,17 @@ pub struct RedistributionCollected {
     pub amount: u64,
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// NOTE: RolloverSeeded is defined but intentionally not emitted.
-// The rollover seed transfer is already captured by PoolCreated.rollover_seed.
-// Kept here for potential future use or off-chain tooling.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Defined but not currently emitted — rollover info carried by PoolCreated.
+/// Emitted when sweep_empty_vault moves a Closed, empty pool's remaining vault
+/// balance to the GlobalState rollover vault.
 #[event]
-pub struct RolloverSeeded {
+pub struct VaultSwept {
     pub pool_id: u64,
     pub amount: u64,
+}
+
+/// Emitted when a player closes their position in a Finalized pool.
+#[event]
+pub struct PositionClosed {
+    pub pool_id: u64,
+    pub player: Pubkey,
 }

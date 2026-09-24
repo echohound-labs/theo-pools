@@ -3,6 +3,7 @@ use anchor_spl::token_interface::{self, Mint, TokenInterface, TokenAccount, Tran
 
 use crate::state::{GlobalState, Pool, PoolStatus, UserPosition};
 use crate::events::{PlayerJoined, PoolActivated};
+use crate::errors::ErrorCode;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INSTRUCTION: deposit
@@ -16,15 +17,14 @@ use crate::events::{PlayerJoined, PoolActivated};
 //   2. Validates player does not already have a position in this pool.
 //   3. Transfers STAKE_AMOUNT tokens from player → pool vault.
 //   4. Initializes UserPosition PDA for this (player, pool) pair.
-//   5. Increments pool.player_count and pool.survivor_count.
-//   6. Resets fill_deadline to now + FILL_TIMEOUT (every join resets timer).
-//      NOTE: Timer reset happens BEFORE checking if pool is now full.
-//   7. If player_count == MAX_PLAYERS:
+//   5. Increments pool.player_count and pool.survivor_count, and resets
+//      fill_deadline = now + FILL_TIMEOUT.
+//   6. If player_count == MAX_PLAYERS:
 //      — Transitions pool to Active
 //      — Sets start_time, end_time, claim_deadline
 //      — Clears GlobalState.active_filling_pool (invariant maintenance)
 //      — Emits PoolActivated
-//   8. Emits PlayerJoined.
+//   7. Emits PlayerJoined.
 //
 // PDA seeds:
 //   UserPosition: ["position", pool_id.to_le_bytes(), player.key()]
@@ -99,11 +99,13 @@ pub fn handler(ctx: Context<Deposit>) -> Result<()> {
     pool.survivor_count = pool.survivor_count.checked_add(1)
         .ok_or(ErrorCode::PlayerCountOverflow)?;
 
-    // ── Step 4: Reset fill timer ──────────────────────────────────────────────
+    // Every join resets the fill timer: the pool gets a fresh FILL_TIMEOUT
+    // window from the most recent deposit. (The initial deadline is set at
+    // pool creation so an unjoined pool can still expire.)
     pool.fill_deadline = now.checked_add(Pool::FILL_TIMEOUT)
         .ok_or(ErrorCode::TimestampOverflow)?;
 
-    // ── Step 5: Emit PlayerJoined ─────────────────────────────────────────────
+    // ── Step 4: Emit PlayerJoined ─────────────────────────────────────────────
     let pool_id = pool.id;
     emit!(PlayerJoined {
         pool_id,
@@ -112,7 +114,7 @@ pub fn handler(ctx: Context<Deposit>) -> Result<()> {
         fill_deadline: pool.fill_deadline,
     });
 
-    // ── Step 6: Check if pool is now full → transition to Active ─────────────
+    // ── Step 5: Check if pool is now full → transition to Active ─────────────
     if pool.player_count == Pool::MAX_PLAYERS {
         let start_time = now;
         let end_time = now.checked_add(Pool::GAME_DURATION)
@@ -198,24 +200,4 @@ pub struct Deposit<'info> {
 
     pub token_program: Interface<'info, TokenInterface>,
     pub system_program: Program<'info, System>,
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ERRORS
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[error_code]
-pub enum ErrorCode {
-    #[msg("Pool is not in Filling state.")]
-    PoolNotFilling,
-    #[msg("This pool is not the active filling pool.")]
-    NotActiveFillingPool,
-    #[msg("Fill timer has expired. This pool is stalled.")]
-    FillTimerExpired,
-    #[msg("Pool is already full.")]
-    PoolFull,
-    #[msg("Player count overflowed.")]
-    PlayerCountOverflow,
-    #[msg("Timestamp arithmetic overflowed.")]
-    TimestampOverflow,
 }

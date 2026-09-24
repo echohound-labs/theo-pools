@@ -3,6 +3,7 @@ use anchor_spl::token_interface::{self, Mint, TokenInterface, TokenAccount, Tran
 
 use crate::state::{Pool, PoolStatus, UserPosition};
 use crate::events::EarlyExit;
+use crate::errors::ErrorCode;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INSTRUCTION: early_exit
@@ -17,7 +18,8 @@ use crate::events::EarlyExit;
 //   3. Transfers EARLY_EXIT_RETURN (0.10 THEO) from pool vault → player.
 //   4. Adds EARLY_EXIT_PENALTY (0.10 THEO) to pool.penalty_vault_balance.
 //   5. Decrements pool.survivor_count.
-//   6. Sets position.exited_early = true.
+//   6. Closes the UserPosition account — rent is refunded to the player.
+//      With the account gone, claim / early_exit can never be called again.
 //   7. Emits EarlyExit.
 //
 // PDA seeds:
@@ -130,9 +132,10 @@ pub struct EarlyExitCtx<'info> {
     )]
     pub pool: Account<'info, Pool>,
 
-    /// Player's position in this pool.
+    /// Player's position in this pool. Closed here — rent returns to the player.
     #[account(
         mut,
+        close = player,
         seeds = [b"position", pool.id.to_le_bytes().as_ref(), player.key().as_ref()],
         bump = user_position.bump,
         constraint = user_position.owner == player.key() @ ErrorCode::Unauthorized,
@@ -164,30 +167,4 @@ pub struct EarlyExitCtx<'info> {
     pub pool_vault: InterfaceAccount<'info, TokenAccount>,
 
     pub token_program: Interface<'info, TokenInterface>,
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ERRORS
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[error_code]
-pub enum ErrorCode {
-    #[msg("Pool is not in Active state.")]
-    PoolNotActive,
-    #[msg("Lock window has expired. Early exit is no longer available.")]
-    LockExpired,
-    #[msg("Player has already exited early.")]
-    AlreadyExited,
-    #[msg("Player already withdrew during Filling phase.")]
-    AlreadyWithdrawn,
-    #[msg("Player has already claimed their reward.")]
-    AlreadyClaimed,
-    #[msg("Math overflow.")]
-    MathOverflow,
-    #[msg("Count underflow.")]
-    CountUnderflow,
-    #[msg("Signer is not the position owner.")]
-    Unauthorized,
-    #[msg("Position does not belong to this pool.")]
-    PositionPoolMismatch,
 }

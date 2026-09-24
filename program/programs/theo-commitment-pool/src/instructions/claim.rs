@@ -3,6 +3,7 @@ use anchor_spl::token_interface::{self, Mint, TokenInterface, TokenAccount, Tran
 
 use crate::state::{Pool, PoolStatus, UserPosition};
 use crate::events::{ClaimWindowOpened, RewardClaimed};
+use crate::errors::ErrorCode;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INSTRUCTION: claim
@@ -109,6 +110,7 @@ pub fn handler(ctx: Context<Claim>) -> Result<()> {
 
     // ── Step 3: Mark position as claimed ─────────────────────────────────────
     position.claimed = true;
+    position.amount = 0;
 
     // ── Step 4: Emit RewardClaimed ────────────────────────────────────────────
     emit!(RewardClaimed {
@@ -172,30 +174,4 @@ pub struct Claim<'info> {
     pub pool_vault: InterfaceAccount<'info, TokenAccount>,
 
     pub token_program: Interface<'info, TokenInterface>,
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ERRORS
-// ─────────────────────────────────────────────────────────────────────────────
-
-#[error_code]
-pub enum ErrorCode {
-    #[msg("Player exited early and is not eligible to claim.")]
-    ExitedEarly,
-    #[msg("Player withdrew during Filling and is not eligible to claim.")]
-    WithdrewDuringFilling,
-    #[msg("Player has already claimed their reward.")]
-    AlreadyClaimed,
-    #[msg("Pool is not in Claiming state.")]
-    PoolNotClaiming,
-    #[msg("Claim window is closed.")]
-    ClaimWindowClosed,
-    #[msg("No reward available — survivor count was zero at claim time.")]
-    NoRewardAvailable,
-    #[msg("Math overflow.")]
-    MathOverflow,
-    #[msg("Signer is not the position owner.")]
-    Unauthorized,
-    #[msg("Position does not belong to this pool.")]
-    PositionPoolMismatch,
 }

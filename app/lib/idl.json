@@ -1767,8 +1767,9 @@
             "name": "fill_deadline",
             "docs": [
               "Deadline by which the pool must reach MAX_PLAYERS.",
-              "Fixed at creation (= creation time + FILL_TIMEOUT); joins do NOT reset it.",
-              "Legacy pools created before this rule hold 0 until their first join."
+              "Set at creation (= creation time + FILL_TIMEOUT) and reset to",
+              "now + FILL_TIMEOUT on every deposit.",
+              "Legacy pools created before the creation-time rule hold 0 until their first join."
             ],
             "type": "i64"
           },

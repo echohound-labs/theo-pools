@@ -65,7 +65,7 @@ export default function PoolsPage() {
         <p style={{ fontSize: 17, color: "var(--text-secondary)", maxWidth: 480, margin: "0 auto 0", lineHeight: 1.7 }}>Stake THEO tokens, survive the full duration, and split the penalty pot with other survivors.</p>
         <div style={{ maxWidth: 720, margin: "32px auto 0", borderRadius: "var(--radius)", overflow: "hidden", border: "1px solid var(--border-subtle)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
           <video controls style={{ width: "100%", display: "block" }} poster="">
-            <source src="/The_Conviction_Engine.mp4" type="video/mp4" />
+            <source src="/THEO_Staking_Pools.mp4" type="video/mp4" />
           </video>
         </div>
       </div>

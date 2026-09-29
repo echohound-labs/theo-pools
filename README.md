@@ -3,7 +3,7 @@
 A conviction staking game on X1. Stake THEO tokens, survive the full duration, and split the penalty pot with other survivors. Quitters fund winners.
 
 🟢 Mainnet live on X1
-👉 https://theo-pools.vercel.app
+👉 https://www.x1theo.xyz
 💬 Telegram: https://t.me/THEOthGreat
 
 ## How It Works
@@ -55,7 +55,7 @@ No admins no exceptions. Fully permissionless. No one can pause it or change the
 
 program/ - Anchor smart contract in Rust
 bot/     - Telegram announcement bot in TypeScript
-app/     - Next.js web app at https://theo-pools.vercel.app
+app/     - Next.js web app at https://www.x1theo.xyz
 
 ## Key Addresses on X1 Mainnet
 

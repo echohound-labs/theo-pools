@@ -15,7 +15,7 @@ export default function RootLayout({
         <title>THEO Pools — X1 Staking</title>
         <meta
           name="description"
-          content="Stake THEO tokens, survive the full duration, and split the penalty pot with other survivors."
+          content="Stake THEO tokens, survive the full duration, and split the reward pot with other survivors."
         />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />

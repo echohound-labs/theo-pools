@@ -62,7 +62,7 @@ export default function PoolsPage() {
       <div style={{ textAlign: "center", padding: "48px 0 40px" }}>
         <div style={{ display: "inline-block", padding: "4px 14px", background: "var(--accent-dim)", border: "1px solid var(--border)", borderRadius: 20, fontSize: 12, fontWeight: 700, color: "var(--accent)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>X1 Mainnet</div>
         <h1 style={{ fontSize: 44, fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 16 }}>THEO <span style={{ color: "var(--accent)", textShadow: "0 0 30px rgba(252,163,17,0.4)" }}>Staking Pools</span></h1>
-        <p style={{ fontSize: 17, color: "var(--text-secondary)", maxWidth: 480, margin: "0 auto 0", lineHeight: 1.7 }}>Stake THEO tokens, survive the full duration, and split the penalty pot with other survivors.</p>
+        <p style={{ fontSize: 17, color: "var(--text-secondary)", maxWidth: 480, margin: "0 auto 0", lineHeight: 1.7 }}>Stake THEO tokens, survive the full duration, and split the reward pot with other survivors.</p>
         <div style={{ maxWidth: 720, margin: "32px auto 0", borderRadius: "var(--radius)", overflow: "hidden", border: "1px solid var(--border-subtle)", boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
           <video controls style={{ width: "100%", display: "block" }} poster="">
             <source src="/theo_new.mp4" type="video/mp4" />

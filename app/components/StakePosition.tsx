@@ -87,7 +87,7 @@ export function StakePosition({ position, onRefresh }: StakePositionProps) {
         <StatBox label={state === "exited" ? "Returned" : "Staked"} value={state === "exited" ? EARLY_EXIT_RETURN.toFixed(2) : state === "claimed" || rolledOver ? "—" : position.stakedAmount.toFixed(2)} unit={state === "claimed" || rolledOver ? "" : "THEO"} />
         {!rolledOver && !position.exitedEarly && (
           <>
-            <StatBox label="Penalty Pot" value={position.penaltyPot.toFixed(2)} unit="THEO" />
+            <StatBox label="Reward Pot" value={position.penaltyPot.toFixed(2)} unit="THEO" />
             <StatBox label="Claimable" value={canClaim || state === "ended" || state === "active" ? `${state === "active" ? "~" : ""}${position.claimableRewards.toFixed(2)}` : canCollect ? position.redistributionPerClaimer.toFixed(2) : "—"} unit={canClaim || canCollect || state === "ended" || state === "active" ? "THEO" : ""} accent />
           </>
         )}

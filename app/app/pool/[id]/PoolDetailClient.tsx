@@ -165,7 +165,7 @@ export default function PoolDetailClient() {
           {[
             { label: "Players", value: `${pool.playerCount}/${pool.maxPlayers}` },
             { label: "Survivors", value: `${pool.survivorCount}` },
-            { label: "Penalty Pot", value: `${pool.penaltyVaultBalance.toFixed(2)} THEO`, accent: true },
+            { label: "Reward Pot", value: `${pool.penaltyVaultBalance.toFixed(2)} THEO`, accent: true },
             { label: "Reward/Survivor", value: pool.rewardPerSurvivor > 0 ? `${pool.rewardPerSurvivor.toFixed(4)} THEO` : "TBD" },
           ].map(({ label, value, accent }) => (
             <div key={label}>
@@ -213,7 +213,7 @@ export default function PoolDetailClient() {
               <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>The claim window closed before this position was claimed. Its stake and reward rolled over to seed the next pool and can no longer be claimed.</p>
             )}
             {posState === "withdrawable" && (
-              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>This pool was closed before it filled. Withdraw to get your full {STAKE_AMOUNT.toFixed(2)} THEO back — no penalty.</p>
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>This pool was closed before it filled. Withdraw to get your full {STAKE_AMOUNT.toFixed(2)} THEO back — nothing forfeited.</p>
             )}
             </>
           ) : (

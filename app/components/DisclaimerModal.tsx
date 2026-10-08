@@ -19,7 +19,7 @@ export function DisclaimerModal({ open, onClose }: { open: boolean; onClose: () 
 
         <p style={{ color: "var(--accent)", fontSize: ".8rem", fontWeight: 700, marginBottom: "0.5rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>2. Game Mechanics & Protocol Rules</p>
         <ol style={{ color: "#aaa", fontSize: ".85rem", lineHeight: 1.8, paddingLeft: "1.2rem", marginBottom: "1rem" }}>
-          <li><strong>Conviction Game.</strong> THEO Pools is a conviction staking game, not a savings product or yield protocol. Early exits result in permanent penalties with no exceptions.</li>
+          <li><strong>Conviction Game.</strong> THEO Pools is a conviction staking game, not a savings product or yield protocol. Early exits permanently forfeit 50% of the stake to the reward pot, with no exceptions.</li>
           <li><strong>Claim Window.</strong> You must claim your rewards within the designated claim window. Unclaimed rewards roll over to the next pool permanently and irrecoverably.</li>
           <li><strong>Fill Window.</strong> If a pool does not reach the required number of players before the fill deadline, it becomes stalled. You must withdraw your stake manually — it is not returned automatically.</li>
           <li><strong>On-Chain Finality.</strong> All transactions are final once confirmed on-chain. There are no chargebacks, reversals, or refunds under any circumstances.</li>
